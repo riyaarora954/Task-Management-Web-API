@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace TM.Model.Entities
 {
-    internal class Task
+    public class Task
     {
     }
 }
