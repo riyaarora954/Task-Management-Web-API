@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TM.Model.Entities
+namespace TM.Contracts.Tasks
 {
-    public class Comment
+    internal class Class1
     {
     }
 }

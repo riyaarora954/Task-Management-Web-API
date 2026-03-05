@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TM.Model.Entities
+namespace TM.ServiceLogic.Interfaces
 {
-    public class Comment
+    internal interface Interface1
     {
     }
 }
