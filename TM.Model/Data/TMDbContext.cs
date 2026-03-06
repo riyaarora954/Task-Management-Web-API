@@ -1,11 +1,13 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using TM.Model.Entities;
+using TM.Model.Data;
+using Task = TM.Model.Entities.Task;
 
 namespace TM.Model.Data
 {
-    public class AppDbContext : DbContext
+    public class TMDbContext : DbContext
     {
-        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+        public TMDbContext(DbContextOptions<TMDbContext> options) : base(options)
         {
         }
 

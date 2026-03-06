@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace TM.ServiceLogic.Interfaces
 {
-    internal interface Interface1
+    internal interface ICommentService
     {
     }
 }

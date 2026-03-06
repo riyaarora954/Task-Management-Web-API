@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace TM.Contracts.Comments
 {
-    internal class Class1
+    internal class CommentResponse
     {
     }
 }

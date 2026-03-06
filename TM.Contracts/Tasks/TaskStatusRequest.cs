@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace TM.Contracts.Tasks
 {
-    internal class Class1
+    internal class TaskStatusResponse  
     {
     }
 }
