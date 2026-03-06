@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 namespace TM.Model.Entities
 {
-
     public class Comment : BaseEntity
     {
         public Guid Id { get; set; } = Guid.NewGuid();
