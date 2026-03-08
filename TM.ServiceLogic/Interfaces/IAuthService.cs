@@ -1,12 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using TM.Contracts.Auth;
 
 namespace TM.ServiceLogic.Interfaces
 {
-    internal class IAuthService
+    public interface IAuthService
     {
+        string GenerateToken(string username, string role);
     }
 }
