@@ -1,9 +1,12 @@
-﻿using TM.Contracts.Auth;
+﻿using System.Threading.Tasks;
+using TM.Contracts.Auth;
 
 namespace TM.ServiceLogic.Interfaces
 {
     public interface IAuthService
     {
-        string GenerateToken(string username, string role);
+        Task<AuthResponse?> RegisterAsync(RegisterRequest request);
+
+        Task<AuthResponse?> LoginAsync(LoginRequest request);
     }
 }
