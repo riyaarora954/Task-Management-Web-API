@@ -1,19 +1,21 @@
 ﻿using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TM.Model.Entities
 {
     public class Task : BaseEntity
     {
-        public Guid Id { get; set; }
+        public string Title { get; set; } = string.Empty;
 
-        public string Title { get; set; }
+        public string Description { get; set; } = string.Empty;
 
-        public string Description { get; set; }
+        public TaskStatus Status { get; set; } = TaskStatus.Pending;
 
-        public TaskStatus Status { get; set; }
+        public int? AssignedToUserId { get; set; } // Change to int?
 
-        public int AssignedToUserId { get; set; }
+        [ForeignKey("AssignedToUserId")]
+        public User? AssignedUser { get; set; }
 
-        public List<Comment> Comments { get; set; } = new List<Comment>();
+        public List<Comment> Comments { get; set; } = new();
     }
 }

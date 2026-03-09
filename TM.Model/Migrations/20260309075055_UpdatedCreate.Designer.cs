@@ -12,8 +12,8 @@ using TM.Model.Data;
 namespace TM.Model.Migrations
 {
     [DbContext(typeof(TMDbContext))]
-    [Migration("20260306125027_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260309075055_UpdatedCreate")]
+    partial class UpdatedCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -27,9 +27,11 @@ namespace TM.Model.Migrations
 
             modelBuilder.Entity("TM.Model.Entities.Comment", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Content")
                         .IsRequired()
@@ -38,17 +40,11 @@ namespace TM.Model.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("TaskId")
+                        .HasColumnType("int");
 
-                    b.Property<Guid>("TaskId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 
@@ -61,18 +57,17 @@ namespace TM.Model.Migrations
 
             modelBuilder.Entity("TM.Model.Entities.Task", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("int");
 
-                    b.Property<int>("AssignedToUserId")
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AssignedToUserId")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -85,25 +80,23 @@ namespace TM.Model.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
                     b.HasKey("Id");
+
+                    b.HasIndex("AssignedToUserId");
 
                     b.ToTable("Tasks");
                 });
 
             modelBuilder.Entity("TM.Model.Entities.User", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<Guid>("CreatedBy")
-                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -112,9 +105,6 @@ namespace TM.Model.Migrations
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
 
                     b.Property<string>("Username")
                         .IsRequired()
@@ -134,7 +124,7 @@ namespace TM.Model.Migrations
                         .IsRequired();
 
                     b.HasOne("TM.Model.Entities.User", "User")
-                        .WithMany("Comments")
+                        .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -146,10 +136,14 @@ namespace TM.Model.Migrations
 
             modelBuilder.Entity("TM.Model.Entities.Task", b =>
                 {
-                    b.Navigation("Comments");
+                    b.HasOne("TM.Model.Entities.User", "AssignedUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedToUserId");
+
+                    b.Navigation("AssignedUser");
                 });
 
-            modelBuilder.Entity("TM.Model.Entities.User", b =>
+            modelBuilder.Entity("TM.Model.Entities.Task", b =>
                 {
                     b.Navigation("Comments");
                 });
