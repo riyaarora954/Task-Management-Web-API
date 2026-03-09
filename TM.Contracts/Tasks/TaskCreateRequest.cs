@@ -6,7 +6,10 @@ using System.Threading.Tasks;
 
 namespace TM.Contracts.Tasks
 {
-    internal class TaskCreateRequest
+    public class TaskCreateRequest
     {
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public int AssignedToUserId { get; set; }
     }
 }

@@ -1,12 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using TM.Contracts.Tasks;
 
 namespace TM.ServiceLogic.Interfaces
 {
-    internal class ITaskService
+    public interface ITaskService
     {
+        Task<TaskResponse?> GetTaskByIdAsync(int id);
+
+        Task<TaskResponse> CreateTaskAsync(TaskCreateRequest request);
+
+        Task<bool> UpdateStatusAsync(int id, string statusName);
     }
 }
