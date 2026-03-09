@@ -24,6 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\TM.Contracts\TM.Contracts.csproj" />
     <ProjectReference Include="..\TM.Model\TM.Model.csproj" />
     <ProjectReference Include="..\TM.ServiceLogic\TM.ServiceLogic.csproj" />
   </ItemGroup>

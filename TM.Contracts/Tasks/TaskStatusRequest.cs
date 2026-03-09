@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 
 namespace TM.Contracts.Tasks
 {
-    internal class TaskStatusResponse  
+    public class TaskStatusRequest
     {
+        public string Status { get; set; } = string.Empty;
     }
 }
