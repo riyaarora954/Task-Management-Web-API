@@ -88,46 +88,61 @@ public class TaskService : ITaskService
 
 
 
-    // --- NEW METHODS ---
+    // --- NEW UPDATED METHODS (Matching Teammate's Auth Style) ---
 
-    // 1. GET ALL
-    public async Task<IEnumerable<TaskResponse>> GetAllTasksAsync()
+    // 1. GET ALL (User-Specific)
+    public async Task<IEnumerable<TaskResponse>> GetAllTasksAsync(int userId, string role)
     {
-        // Fetch all tasks and include the assigned user for mapping
-        var tasks = await _context.Tasks
-            .Include(t => t.AssignedUser)
-            .ToListAsync();
+        var query = _context.Tasks.Include(t => t.AssignedUser).AsQueryable();
 
+        if (role == "Admin")
+        {
+            // Admins only see tasks THEY created (using CreatedBy from BaseEntity)
+            query = query.Where(t => t.CreatedBy == userId);
+        }
+        else
+        {
+            // Regular Users only see tasks ASSIGNED to them
+            query = query.Where(t => t.AssignedToUserId == userId);
+        }
+
+        var tasks = await query.ToListAsync();
         return _mapper.Map<IEnumerable<TaskResponse>>(tasks);
     }
 
-    // 2. UPDATE TASK
-    public async Task<TaskResponse?> UpdateTaskAsync(int id, TaskUpdateRequest request)
+    // 2. UPDATE TASK (Creator-Specific)
+    public async Task<TaskResponse?> UpdateTaskAsync(int id, TaskUpdateRequest request, int userId)
     {
-        // Find the task we want to update
         var task = await _context.Tasks.FirstOrDefaultAsync(t => t.Id == id);
 
-        if (task == null) return null; // Let the controller know it wasn't found
+        // Matches Security Style: Only the Admin who created it can update it
+        if (task == null || task.CreatedBy != userId)
+        {
+            return null;
+        }
 
-        // Update the properties
         task.Title = request.Title;
         task.Description = request.Description;
         task.AssignedToUserId = request.AssignedToUserId;
 
         await _context.SaveChangesAsync();
 
-        // Reload the AssignedUser reference so AutoMapper grabs the new username if it changed
+        // Reload user info for the response
         await _context.Entry(task).Reference(t => t.AssignedUser).LoadAsync();
 
         return _mapper.Map<TaskResponse>(task);
     }
 
-    // 3. DELETE TASK
-    public async Task<bool> DeleteTaskAsync(int id)
+    // 3. DELETE TASK (Creator-Specific)
+    public async Task<bool> DeleteTaskAsync(int id, int userId)
     {
         var task = await _context.Tasks.FindAsync(id);
 
-        if (task == null) return false;
+        // Matches Security Style: Only the Admin who created it can delete it
+        if (task == null || task.CreatedBy != userId)
+        {
+            return false;
+        }
 
         _context.Tasks.Remove(task);
         await _context.SaveChangesAsync();

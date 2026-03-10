@@ -12,8 +12,8 @@ using TM.Model.Data;
 namespace TM.Model.Migrations
 {
     [DbContext(typeof(TMDbContext))]
-    [Migration("20260310071844_InitialMigration")]
-    partial class InitialMigration
+    [Migration("20260310104243_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
