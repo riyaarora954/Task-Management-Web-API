@@ -1,12 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
 namespace TM.Contracts.Comments
 {
-    internal class CommentResponse
+    public class CommentResponse
     {
+        public int Id { get; set; }
+        public string Content { get; set; } = string.Empty;
+        public string AuthorName { get; set; } = string.Empty; // To show who wrote it
+        public DateTime CreatedAt { get; set; }
     }
 }

@@ -1,12 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿
+using TM.Contracts.Comments;
 
 namespace TM.ServiceLogic.Interfaces
 {
-    internal interface ICommentService
+    public interface ICommentService
     {
+        Task<CommentResponse?> AddCommentAsync(CommentRequest request, int currentUserId, string role);
+        Task<bool?> DeleteCommentAsync(int commentId, int currentUserId, string role);
     }
 }
