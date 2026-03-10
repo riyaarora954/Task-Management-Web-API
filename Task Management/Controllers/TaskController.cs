@@ -15,25 +15,61 @@ public class TasksController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
-        var task = await _taskService.GetTaskByIdAsync(id);
-        return task != null ? Ok(task) : NotFound();
+        // Get info from the token
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var userRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+
+        if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
+
+        int currentUserId = int.Parse(userIdClaim);
+
+        // Call service with the extra security info
+        var task = await _taskService.GetTaskByIdAsync(id, currentUserId, userRole ?? "User");
+
+        if (task == null)
+        {
+            // We return 'Forbid' so they know they exist but aren't allowed to see it
+            return Forbid("You are not the creator (Admin) or the assigned user for this task.");
+        }
+
+        return Ok(task);
     }
 
-    [Authorize(Roles = "Admin")] 
+    [Authorize(Roles = "Admin")] // Only Admins can enter this "Room"
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] TaskCreateRequest request)
     {
-        var result = await _taskService.CreateTaskAsync(request);
+        // 1. Extract the ID automatically from the JWT NameIdentifier claim
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
+
+        int adminId = int.Parse(userIdClaim);
+
+        // 2. Pass the extracted adminId to the service
+        var result = await _taskService.CreateTaskAsync(request, adminId);
+
         return Ok(result);
     }
 
     [HttpPatch("{id}/status")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] TaskStatusRequest request)
     {
-        
-        var success = await _taskService.UpdateStatusAsync(id, request.Status);
+        // Extract info from the logged-in user's token
+        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var userRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "User";
 
-        if (!success) return BadRequest("Invalid status name provided.");
+        if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
+
+        int currentUserId = int.Parse(userIdClaim);
+
+        // Pass the user info for the security check
+        var success = await _taskService.UpdateStatusAsync(id, request.Status, currentUserId, userRole);
+
+        if (!success)
+        {
+            return Forbid("You do not have permission to update the status of this task.");
+        }
 
         return NoContent();
     }

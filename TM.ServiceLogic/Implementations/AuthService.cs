@@ -17,7 +17,7 @@ namespace TM.ServiceLogic.Implementations
     {
         private readonly TMDbContext _context;
         private readonly IConfiguration _config;
-        private readonly IMapper _mapper; 
+        private readonly IMapper _mapper;
 
         public AuthService(TMDbContext context, IConfiguration config, IMapper mapper)
         {
@@ -69,19 +69,20 @@ namespace TM.ServiceLogic.Implementations
 
             var claims = new[]
             {
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role),
-                new Claim("UserId", user.Id.ToString())
-            };
+        new Claim(ClaimTypes.Name, user.Username),
+        new Claim(ClaimTypes.Role, user.Role),
+        // 🛡️ FIX: Use ClaimTypes.NameIdentifier instead of the custom "UserId" string
+        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
+    };
 
             var token = new JwtSecurityToken(
                 _config["Jwt:Issuer"],
                 _config["Jwt:Audience"],
                 claims,
-                expires: DateTime.Now.AddHours(3),
+                expires: DateTime.UtcNow.AddHours(3), // Use UtcNow for global consistency
                 signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
-}
+    }
