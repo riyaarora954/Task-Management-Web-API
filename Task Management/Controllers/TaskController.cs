@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using TM.Contracts.Tasks;
 using TM.ServiceLogic.Interfaces;
 
@@ -73,36 +74,44 @@ public class TasksController : ControllerBase
 
         return NoContent();
     }
-
-    [HttpGet]
+    [HttpGet("/api/Users/Tasks")]
     public async Task<IActionResult> GetAll()
     {
-        var tasks = await _taskService.GetAllTasksAsync();
+        // Extract ID and Role from the JWT Token
+        int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        string role = User.FindFirst(ClaimTypes.Role)!.Value;
+
+        var tasks = await _taskService.GetAllTasksAsync(userId, role);
         return Ok(tasks);
     }
 
-    // 2. UPDATE TASK (Title, Description, etc.)
+    // 2. UPDATE TASK (Only for Admin who created it)
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, [FromBody] TaskUpdateRequest request)
     {
-        var updatedTask = await _taskService.UpdateTaskAsync(id, request);
+        int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+        var updatedTask = await _taskService.UpdateTaskAsync(id, request, userId);
 
         if (updatedTask == null)
-            return NotFound($"Task with ID {id} not found.");
+            return Forbid("You can only update tasks that you created.");
 
         return Ok(updatedTask);
     }
 
-    // 3. DELETE TASK (Only Admins)
+    // 3. DELETE TASK (Only for Admin who created it)
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin")] // <--- THIS is the security guard
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(int id)
     {
-        var success = await _taskService.DeleteTaskAsync(id);
+        int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+        var success = await _taskService.DeleteTaskAsync(id, userId);
 
         if (!success)
-            return NotFound($"Task with ID {id} not found.");
+            return Forbid("You can only delete tasks that you created.");
 
-        return Ok(); // Success (204)
+        return Ok(new { message = "Task deleted successfully" });
     }
 }

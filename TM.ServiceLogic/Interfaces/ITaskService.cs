@@ -13,8 +13,8 @@ namespace TM.ServiceLogic.Interfaces
         Task<bool> UpdateStatusAsync(int id, string statusName, int currentUserId, string role);
 
 
-        Task<IEnumerable<TaskResponse>> GetAllTasksAsync();
-        Task<TaskResponse?> UpdateTaskAsync(int id, TaskUpdateRequest request);
-        Task<bool> DeleteTaskAsync(int id);
+        Task<IEnumerable<TaskResponse>> GetAllTasksAsync(int userId, string role);
+        Task<TaskResponse?> UpdateTaskAsync(int id, TaskUpdateRequest request, int userId);
+        Task<bool> DeleteTaskAsync(int id, int userId);
     }
 }
