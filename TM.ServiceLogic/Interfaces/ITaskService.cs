@@ -4,11 +4,13 @@ namespace TM.ServiceLogic.Interfaces
 {
     public interface ITaskService
     {
-        Task<TaskResponse?> GetTaskByIdAsync(int id);
+        // Update the signature to accept the ID and Role
+        Task<TaskResponse?> GetTaskByIdAsync(int id, int currentUserId, string role);
 
-        Task<TaskResponse> CreateTaskAsync(TaskCreateRequest request);
+        Task<TaskResponse> CreateTaskAsync(TaskCreateRequest request, int adminId);
 
-        Task<bool> UpdateStatusAsync(int id, string statusName);
+        // Update the signature to include security parameters
+        Task<bool> UpdateStatusAsync(int id, string statusName, int currentUserId, string role);
 
 
         Task<IEnumerable<TaskResponse>> GetAllTasksAsync();
