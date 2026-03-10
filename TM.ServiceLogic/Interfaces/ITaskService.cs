@@ -9,5 +9,10 @@ namespace TM.ServiceLogic.Interfaces
         Task<TaskResponse> CreateTaskAsync(TaskCreateRequest request);
 
         Task<bool> UpdateStatusAsync(int id, string statusName);
+
+
+        Task<IEnumerable<TaskResponse>> GetAllTasksAsync();
+        Task<TaskResponse?> UpdateTaskAsync(int id, TaskUpdateRequest request);
+        Task<bool> DeleteTaskAsync(int id);
     }
 }

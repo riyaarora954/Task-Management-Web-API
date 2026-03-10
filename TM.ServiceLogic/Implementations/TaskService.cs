@@ -58,4 +58,55 @@ public class TaskService : ITaskService
 
         return false; 
     }
+
+
+
+    // --- NEW METHODS ---
+
+    // 1. GET ALL
+    public async Task<IEnumerable<TaskResponse>> GetAllTasksAsync()
+    {
+        // Fetch all tasks and include the assigned user for mapping
+        var tasks = await _context.Tasks
+            .Include(t => t.AssignedUser)
+            .ToListAsync();
+
+        return _mapper.Map<IEnumerable<TaskResponse>>(tasks);
+    }
+
+    // 2. UPDATE TASK
+    public async Task<TaskResponse?> UpdateTaskAsync(int id, TaskUpdateRequest request)
+    {
+        // Find the task we want to update
+        var task = await _context.Tasks.FirstOrDefaultAsync(t => t.Id == id);
+
+        if (task == null) return null; // Let the controller know it wasn't found
+
+        // Update the properties
+        task.Title = request.Title;
+        task.Description = request.Description;
+        task.AssignedToUserId = request.AssignedToUserId;
+
+        await _context.SaveChangesAsync();
+
+        // Reload the AssignedUser reference so AutoMapper grabs the new username if it changed
+        await _context.Entry(task).Reference(t => t.AssignedUser).LoadAsync();
+
+        return _mapper.Map<TaskResponse>(task);
+    }
+
+    // 3. DELETE TASK
+    public async Task<bool> DeleteTaskAsync(int id)
+    {
+        var task = await _context.Tasks.FindAsync(id);
+
+        if (task == null) return false;
+
+        _context.Tasks.Remove(task);
+        await _context.SaveChangesAsync();
+
+        return true;
+    }
 }
+
+

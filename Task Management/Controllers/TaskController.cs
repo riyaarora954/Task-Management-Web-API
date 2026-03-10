@@ -37,4 +37,36 @@ public class TasksController : ControllerBase
 
         return NoContent();
     }
+
+    [HttpGet]
+    public async Task<IActionResult> GetAll()
+    {
+        var tasks = await _taskService.GetAllTasksAsync();
+        return Ok(tasks);
+    }
+
+    // 2. UPDATE TASK (Title, Description, etc.)
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, [FromBody] TaskUpdateRequest request)
+    {
+        var updatedTask = await _taskService.UpdateTaskAsync(id, request);
+
+        if (updatedTask == null)
+            return NotFound($"Task with ID {id} not found.");
+
+        return Ok(updatedTask);
+    }
+
+    // 3. DELETE TASK (Only Admins)
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")] // <--- THIS is the security guard
+    public async Task<IActionResult> Delete(int id)
+    {
+        var success = await _taskService.DeleteTaskAsync(id);
+
+        if (!success)
+            return NotFound($"Task with ID {id} not found.");
+
+        return Ok(); // Success (204)
+    }
 }
