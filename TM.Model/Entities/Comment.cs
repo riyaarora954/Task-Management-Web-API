@@ -10,7 +10,7 @@ namespace TM.Model.Entities
         [ForeignKey("TaskId")]
         public Task? Task { get; set; }
 
-        public int UserId { get; set; }
+        public int UserId { get; set; } 
 
         [ForeignKey("UserId")]
         public User? User { get; set; }
