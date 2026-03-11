@@ -77,5 +77,51 @@ namespace TM.ServiceLogic.Implementations
             // If they aren't the author and aren't the task's Admin, they are blocked
             return false; // 403 Forbidden
         }
+
+
+        // ADD THESE METHODS AT THE BOTTOM OF YOUR CommentService CLASS:
+
+        public async Task<IEnumerable<CommentResponse>?> GetCommentsByTaskIdAsync(int taskId, int currentUserId, string role)
+        {
+            // 1. Find the task to verify who is allowed to see the comments
+            var task = await _context.Tasks.FindAsync(taskId);
+            if (task == null) return null;
+
+            // 🛡️ AUTH CHECK: Matches teammate's style
+            // Only the Admin who created the task OR the User assigned to the task can see the comments
+            bool isCreator = (role == "Admin" && task.CreatedBy == currentUserId);
+            bool isAssigned = (task.AssignedToUserId == currentUserId);
+
+            if (!isCreator && !isAssigned) return null;
+
+            // 2. Fetch and return comments
+            var comments = await _context.Comments
+                .Include(c => c.User)
+                .Where(c => c.TaskId == taskId)
+                .OrderByDescending(c => c.CreatedAt)
+                .ToListAsync();
+
+            return _mapper.Map<IEnumerable<CommentResponse>>(comments);
+        }
+
+        public async Task<CommentResponse?> UpdateCommentAsync(int commentId, CommentRequest request, int currentUserId)
+        {
+            var comment = await _context.Comments
+                .Include(c => c.User)
+                .FirstOrDefaultAsync(c => c.Id == commentId);
+
+            if (comment == null) return null;
+
+            // 🛡️ AUTH CHECK: Strictly only the person who wrote the comment can edit it
+            // Even an Admin cannot edit a user's specific comment text
+            if (comment.UserId != currentUserId) return null;
+
+            comment.Content = request.Content;
+
+            await _context.SaveChangesAsync();
+            return _mapper.Map<CommentResponse>(comment);
+        }
+
+
     }
 }
