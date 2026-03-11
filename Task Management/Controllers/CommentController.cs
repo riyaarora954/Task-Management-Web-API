@@ -54,5 +54,42 @@ namespace Task_Management.Controllers
 
             return NoContent(); // Success!
         }
+
+
+
+        // ADD THESE ENDPOINTS TO YOUR EXISTING CommentsController CLASS:
+
+        [HttpGet("task/{taskId}")]
+        public async Task<IActionResult> GetByTaskId(int taskId)
+        {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+            var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "User";
+
+            var comments = await _commentService.GetCommentsByTaskIdAsync(taskId, userId, role);
+
+            if (comments == null)
+            {
+                return Forbid("You do not have permission to view comments for this task.");
+            }
+
+            return Ok(comments);
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, [FromBody] CommentRequest request)
+        {
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+
+            var result = await _commentService.UpdateCommentAsync(id, request, userId);
+
+            if (result == null)
+            {
+                return Forbid("You can only edit your own comments.");
+            }
+
+            return Ok(result);
+        }
+
+
     }
 }
