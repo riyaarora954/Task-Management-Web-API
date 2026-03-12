@@ -21,14 +21,19 @@ namespace TM.WebAPI.Controllers
             var response = await _authService.RegisterAsync(request);
 
             if (response == null)
-                return BadRequest("Username already exists.");
+                return BadRequest("A user with this email already exists.");
+
             return Ok(response);
         }
+
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             var response = await _authService.LoginAsync(request);
-            if (response == null) return Unauthorized("Invalid username or password.");
+
+            if (response == null)
+                return Unauthorized("Invalid email or password."); 
+
             return Ok(response);
         }
     }

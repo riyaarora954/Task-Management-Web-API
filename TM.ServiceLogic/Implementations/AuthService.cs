@@ -28,14 +28,28 @@ namespace TM.ServiceLogic.Implementations
 
         public async Task<AuthResponse?> RegisterAsync(RegisterRequest request)
         {
-            if (await _context.Users.AnyAsync(u => u.Username == request.Username))
+            if (await _context.Users.AnyAsync(u => u.Email == request.Email))
                 return null;
+
+            string normalizedRole = "User"; 
+            if (!string.IsNullOrWhiteSpace(request.Role))
+            {
+               
+                normalizedRole = char.ToUpper(request.Role[0]) + request.Role.Substring(1).ToLower();
+
+                
+                if (normalizedRole != "Admin" && normalizedRole != "User")
+                {
+                    normalizedRole = "User";
+                }
+            }
 
             var user = new User
             {
+                Email = request.Email,
                 Username = request.Username,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                Role = request.Role
+                Role = normalizedRole 
             };
 
             _context.Users.Add(user);
@@ -49,8 +63,9 @@ namespace TM.ServiceLogic.Implementations
 
         public async Task<AuthResponse?> LoginAsync(LoginRequest request)
         {
+         
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Username == request.Username);
+                .FirstOrDefaultAsync(u => u.Email == request.Email);
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
@@ -62,6 +77,7 @@ namespace TM.ServiceLogic.Implementations
 
             return response;
         }
+
         private string GenerateJwtToken(User user)
         {
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
@@ -69,20 +85,19 @@ namespace TM.ServiceLogic.Implementations
 
             var claims = new[]
             {
-        new Claim(ClaimTypes.Name, user.Username),
-        new Claim(ClaimTypes.Role, user.Role),
-        // 🛡️ FIX: Use ClaimTypes.NameIdentifier instead of the custom "UserId" string
-        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
-    };
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.Role, user.Role), 
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
+            };
 
             var token = new JwtSecurityToken(
                 _config["Jwt:Issuer"],
                 _config["Jwt:Audience"],
                 claims,
-                expires: DateTime.UtcNow.AddHours(3), // Use UtcNow for global consistency
+                expires: DateTime.UtcNow.AddHours(3),
                 signingCredentials: credentials);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
-    }
+}

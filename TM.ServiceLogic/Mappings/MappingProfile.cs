@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using TM.Contracts.Auth;
+using TM.Contracts.Comments;
 using TM.Contracts.Tasks;
 using TM.Model.Entities;
 
@@ -18,6 +19,7 @@ namespace TM.ServiceLogic.Mappings
                            opt => opt.MapFrom(src => src.AssignedUser != null ? src.AssignedUser.Username : "Unassigned"));
             
             CreateMap<TaskCreateRequest, TM.Model.Entities.Task>();
+            CreateMap<Comment, CommentResponse>().ForMember(dest => dest.AuthorName, opt => opt.MapFrom(src => src.User.Username));
 
         }
     }
