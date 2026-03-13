@@ -9,6 +9,7 @@ namespace TM.Model.Entities
         public string Description { get; set; } = string.Empty;
         public TaskStatus Status { get; set; } = TaskStatus.Pending;
 
+        // int? ensures the value is NULL in DB when unassigned
         public int? AssignedToUserId { get; set; }
 
         [ForeignKey("AssignedToUserId")]
@@ -17,5 +18,8 @@ namespace TM.Model.Entities
         public List<Comment> Comments { get; set; } = new();
 
         public int CreatedBy { get; set; }
+
+        // SOFT DELETE FLAG
+        public bool IsDeleted { get; set; } = false;
     }
 }
