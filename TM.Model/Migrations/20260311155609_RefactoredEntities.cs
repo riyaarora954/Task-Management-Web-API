@@ -7,7 +7,7 @@ namespace TM.Model.Migrations
     /// <inheritdoc />
     public partial class RefactoredEntities : Migration
     {
-        /// <inheritdoc />
+        
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(

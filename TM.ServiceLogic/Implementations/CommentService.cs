@@ -54,7 +54,7 @@ namespace TM.ServiceLogic.Implementations
 
             if (isAuthor || isTaskCreatorAdmin)
             {
-                comment.IsDeleted = true; // Soft delete - history remains
+                comment.IsDeleted = true; 
                 await _context.SaveChangesAsync();
                 return true;
             }
