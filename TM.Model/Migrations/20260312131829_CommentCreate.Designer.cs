@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TM.Model.Data;
 
@@ -11,9 +12,11 @@ using TM.Model.Data;
 namespace TM.Model.Migrations
 {
     [DbContext(typeof(TMDbContext))]
-    partial class TMDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260312131829_CommentCreate")]
+    partial class CommentCreate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

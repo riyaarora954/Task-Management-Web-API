@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace TM.Model.Entities
 {
+    //User is inheriting Id and CreatedAt fields from BaseEntity.
     public class User : BaseEntity
     {
         public string Email { get; set; } = string.Empty;

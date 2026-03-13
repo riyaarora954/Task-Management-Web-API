@@ -33,17 +33,16 @@ namespace Task_Management.Controllers
 
             return Ok(result);
         }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            // 🔍 Extract identity from JWT
-            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "User";
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "User";
 
             if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
             int currentUserId = int.Parse(userIdClaim);
 
-            // Call service
             var result = await _commentService.DeleteCommentAsync(id, currentUserId, role);
 
             if (result == null)
@@ -52,12 +51,8 @@ namespace Task_Management.Controllers
             if (result == false)
                 return Forbid("You can only delete your own comments, unless you are the Admin who created this task.");
 
-            return NoContent(); // Success!
+            return NoContent();
         }
-
-
-
-        // ADD THESE ENDPOINTS TO YOUR EXISTING CommentsController CLASS:
 
         [HttpGet("task/{taskId}")]
         public async Task<IActionResult> GetByTaskId(int taskId)
@@ -89,7 +84,5 @@ namespace Task_Management.Controllers
 
             return Ok(result);
         }
-
-
     }
 }
