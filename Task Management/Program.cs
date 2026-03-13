@@ -26,7 +26,7 @@ builder.Services.AddSwaggerGen(opt =>
         BearerFormat = "JWT",
         Scheme = "bearer"
     });
-
+    // Adding global security requirement to include the Bearer token in all API requests
     opt.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -47,6 +47,7 @@ builder.Services.AddSwaggerGen(opt =>
 builder.Services.AddDbContext<TMDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+//Adding services for dependency injection
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<ICommentService, CommentService>();
@@ -66,6 +67,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
+// Adding AutoMapper
 builder.Services.AddAutoMapper(cfg =>
 {
     cfg.AddProfile<MappingProfile>();

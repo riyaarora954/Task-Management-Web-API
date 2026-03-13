@@ -90,6 +90,11 @@ namespace TM.ServiceLogic.Implementations
             bool isAssignedToAnything = await _context.Tasks.AnyAsync(t =>
                 t.AssignedToUserId == id && !t.IsDeleted);
 
+            if (user.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                return (false, "Security Restriction: Admins cannot be deleted through this endpoint.");
+            }
+
             if (isAssignedToAnything)
                 return (false, "User is still assigned to tasks. Please unassign them first.");
 
