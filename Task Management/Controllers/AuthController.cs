@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using TM.Contracts.Auth;
 using TM.ServiceLogic.Interfaces;
 
@@ -9,20 +11,13 @@ namespace TM.WebAPI.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
-
-        public AuthController(IAuthService authService)
-        {
-            _authService = authService;
-        }
+        public AuthController(IAuthService authService) => _authService = authService;
 
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
             var response = await _authService.RegisterAsync(request);
-
-            if (response == null)
-                return BadRequest("A user with this email already exists.");
-
+            if (response == null) return BadRequest(new { message = "Email already exists." });
             return Ok(response);
         }
 
@@ -30,11 +25,27 @@ namespace TM.WebAPI.Controllers
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             var response = await _authService.LoginAsync(request);
-
-            if (response == null)
-                return Unauthorized("Invalid email or password."); 
-
+            if (response == null) return Unauthorized(new { message = "Invalid email or password." });
             return Ok(response);
+        }
+
+        [HttpGet("users")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetAllUsers()
+            => Ok(await _authService.GetUsersByRoleAsync("User"));
+
+        [HttpGet("admins")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetAllAdmins()
+            => Ok(await _authService.GetUsersByRoleAsync("Admin"));
+
+        [HttpDelete("users/{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DeleteUser(int id)
+        {
+            var result = await _authService.SoftDeleteUserAsync(id);
+            if (!result.Success) return BadRequest(new { message = result.Message });
+            return Ok(new { message = result.Message });
         }
     }
 }

@@ -1,5 +1,4 @@
-﻿using System;
-namespace TM.Contracts.Comments
+﻿namespace TM.Contracts.Comments
 {
     public class CommentResponse
     {
