@@ -21,75 +21,97 @@ namespace Task_Management.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CommentRequest request)
         {
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-            var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "User";
-
-            var result = await _commentService.AddCommentAsync(request, userId, role);
-
-            if (result == null)
+            try
             {
-                return Forbid("Only the task creator (Admin) or the assigned user can comment.");
-            }
+                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+                var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "User";
 
-            return Ok(result);
+                var result = await _commentService.AddCommentAsync(request, userId, role);
+
+                if (result == null)
+                {
+                    return Forbid("Only the task creator (Admin) or the assigned user can comment.");
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred while creating the comment: {ex.Message}");
+            }
         }
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            // 🔍 Extract identity from JWT
-            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-            var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "User";
+            try
+            {
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "User";
 
-            if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
-            int currentUserId = int.Parse(userIdClaim);
+                if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
+                int currentUserId = int.Parse(userIdClaim);
 
-            // Call service
-            var result = await _commentService.DeleteCommentAsync(id, currentUserId, role);
+                var result = await _commentService.DeleteCommentAsync(id, currentUserId, role);
 
-            if (result == null)
-                return NotFound("Comment not found.");
+                if (result == null)
+                    return NotFound("Comment not found.");
 
-            if (result == false)
-                return Forbid("You can only delete your own comments, unless you are the Admin who created this task.");
+                if (result == false)
+                    return Forbid("You can only delete your own comments, unless you are the Admin who created this task.");
 
-            return NoContent(); // Success!
+                // CHANGE THIS LINE:
+                return Ok(new { message = "Comment deleted successfully." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred while deleting the comment: {ex.Message}");
+            }
         }
-
-
-
-        // ADD THESE ENDPOINTS TO YOUR EXISTING CommentsController CLASS:
 
         [HttpGet("task/{taskId}")]
         public async Task<IActionResult> GetByTaskId(int taskId)
         {
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-            var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "User";
-
-            var comments = await _commentService.GetCommentsByTaskIdAsync(taskId, userId, role);
-
-            if (comments == null)
+            try
             {
-                return Forbid("You do not have permission to view comments for this task.");
-            }
+                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+                var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "User";
 
-            return Ok(comments);
+                var comments = await _commentService.GetCommentsByTaskIdAsync(taskId, userId, role);
+
+                if (comments == null)
+                {
+                    return Forbid("You do not have permission to view comments for this task.");
+                }
+
+                return Ok(comments);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred while fetching comments: {ex.Message}");
+            }
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] CommentRequest request)
         {
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
-
-            var result = await _commentService.UpdateCommentAsync(id, request, userId);
-
-            if (result == null)
+            try
             {
-                return Forbid("You can only edit your own comments.");
+                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+
+                var result = await _commentService.UpdateCommentAsync(id, request, userId);
+
+                if (result == null)
+                {
+                    return Forbid("You can only edit your own comments.");
+                }
+
+                return Ok(result);
             }
-
-            return Ok(result);
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred while updating the comment: {ex.Message}");
+            }
         }
-
-
     }
 }

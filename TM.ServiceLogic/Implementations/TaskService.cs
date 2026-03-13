@@ -111,25 +111,19 @@ public class TaskService : ITaskService
     }
 
     // 2. UPDATE TASK (Creator-Specific)
+    // Inside UpdateTaskAsync
     public async Task<TaskResponse?> UpdateTaskAsync(int id, TaskUpdateRequest request, int userId)
     {
         var task = await _context.Tasks.FirstOrDefaultAsync(t => t.Id == id);
-
-        // Matches Security Style: Only the Admin who created it can update it
-        if (task == null || task.CreatedBy != userId)
-        {
-            return null;
-        }
+        if (task == null || task.CreatedBy != userId) return null;
 
         task.Title = request.Title;
         task.Description = request.Description;
         task.AssignedToUserId = request.AssignedToUserId;
+        task.DueDate = request.DueDate; // Map the new field
 
         await _context.SaveChangesAsync();
-
-        // Reload user info for the response
         await _context.Entry(task).Reference(t => t.AssignedUser).LoadAsync();
-
         return _mapper.Map<TaskResponse>(task);
     }
 
@@ -138,15 +132,14 @@ public class TaskService : ITaskService
     {
         var task = await _context.Tasks.FindAsync(id);
 
-        // Matches Security Style: Only the Admin who created it can delete it
-        if (task == null || task.CreatedBy != userId)
-        {
-            return false;
-        }
+        if (task == null)
+            throw new Exception("Task not found.");
+
+        if (task.CreatedBy != userId)
+            throw new Exception("You do not have permission to delete this task.");
 
         _context.Tasks.Remove(task);
         await _context.SaveChangesAsync();
-
         return true;
     }
 }

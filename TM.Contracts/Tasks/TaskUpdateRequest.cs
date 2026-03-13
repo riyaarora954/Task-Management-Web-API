@@ -12,5 +12,7 @@ namespace TM.Contracts.Tasks
         public string Description { get; set; } = string.Empty;
 
         public int? AssignedToUserId { get; set; }
+
+        public DateTime? DueDate { get; set; }
     }
 }

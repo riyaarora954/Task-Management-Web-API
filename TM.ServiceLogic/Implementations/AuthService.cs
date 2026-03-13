@@ -26,30 +26,20 @@ namespace TM.ServiceLogic.Implementations
             _mapper = mapper;
         }
 
+
         public async Task<AuthResponse?> RegisterAsync(RegisterRequest request)
         {
-            if (await _context.Users.AnyAsync(u => u.Email == request.Email))
-                return null;
+            if (await _context.Users.AnyAsync(u => u.Email == request.Email)) return null;
 
-            string normalizedRole = "User"; 
-            if (!string.IsNullOrWhiteSpace(request.Role))
-            {
-               
-                normalizedRole = char.ToUpper(request.Role[0]) + request.Role.Substring(1).ToLower();
-
-                
-                if (normalizedRole != "Admin" && normalizedRole != "User")
-                {
-                    normalizedRole = "User";
-                }
-            }
+            // Convert string "Admin" from request to Enum UserRole.Admin
+            Enum.TryParse<UserRole>(request.Role, true, out var assignedRole);
 
             var user = new User
             {
                 Email = request.Email,
                 Username = request.Username,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                Role = normalizedRole 
+                Role = assignedRole // Using the Enum
             };
 
             _context.Users.Add(user);
@@ -57,9 +47,10 @@ namespace TM.ServiceLogic.Implementations
 
             var response = _mapper.Map<AuthResponse>(user);
             response.Token = GenerateJwtToken(user);
-
             return response;
         }
+
+
 
         public async Task<AuthResponse?> LoginAsync(LoginRequest request)
         {
@@ -85,15 +76,13 @@ namespace TM.ServiceLogic.Implementations
 
             var claims = new[]
             {
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role), 
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
-            };
+        new Claim(ClaimTypes.Name, user.Username),
+        new Claim(ClaimTypes.Role, user.Role.ToString()), // Enum to String for JWT
+        new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
+    };
 
             var token = new JwtSecurityToken(
-                _config["Jwt:Issuer"],
-                _config["Jwt:Audience"],
-                claims,
+                _config["Jwt:Issuer"], _config["Jwt:Audience"], claims,
                 expires: DateTime.UtcNow.AddHours(3),
                 signingCredentials: credentials);
 

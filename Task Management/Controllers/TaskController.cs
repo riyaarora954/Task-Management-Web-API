@@ -16,42 +16,51 @@ public class TasksController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
-        // Get info from the token
-        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        var userRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
-
-        if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
-
-        int currentUserId = int.Parse(userIdClaim);
-
-        // Call service with the extra security info
-        var task = await _taskService.GetTaskByIdAsync(id, currentUserId, userRole ?? "User");
-
-        if (task == null)
+        try
         {
-            // We return 'Forbid' so they know they exist but aren't allowed to see it
-            return Forbid("You are not the creator (Admin) or the assigned user for this task.");
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+            int currentUserId = int.Parse(userIdClaim!);
+
+            var task = await _taskService.GetTaskByIdAsync(id, currentUserId, userRole ?? "User");
+
+            if (task == null)
+            {
+                // Instead of a generic error, we return a specific message
+                return StatusCode(403, new { message = "You are not authorized to view this task." });
+            }
+
+            return Ok(task);
         }
-
-        return Ok(task);
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = "An error occurred: " + ex.Message });
+        }
     }
 
-    [Authorize(Roles = "Admin")] // Only Admins can enter this "Room"
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] TaskCreateRequest request)
+    [ProducesResponseType(typeof(TaskResponse), 200)]
+    public async Task<IActionResult> Create([FromBody] TM.Contracts.Tasks.TaskCreateRequest request)
     {
-        // 1. Extract the ID automatically from the JWT NameIdentifier claim
-        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        try
+        {
+            // Manual Role Check to provide custom message
+            if (!User.IsInRole("Admin"))
+            {
+                return StatusCode(403, new { message = "Only Administrators can create tasks." });
+            }
 
-        if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
+            int adminId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+            var result = await _taskService.CreateTaskAsync(request, adminId);
 
-        int adminId = int.Parse(userIdClaim);
-
-        // 2. Pass the extracted adminId to the service
-        var result = await _taskService.CreateTaskAsync(request, adminId);
-
-        return Ok(result);
+            return Ok(result); // Success: Returns Task object only
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
+
 
     [HttpPatch("{id}/status")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] TaskStatusRequest request)
@@ -101,17 +110,32 @@ public class TasksController : ControllerBase
     }
 
     // 3. DELETE TASK (Only for Admin who created it)
+    // 2. DELETE TASK FIX (The one from your screenshot)
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(int id)
     {
-        int userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        try
+        {
+            // Manual Role Check
+            if (!User.IsInRole("Admin"))
+            {
+                return StatusCode(403, new { message = "You do not have permission to delete tasks. Admin role required." });
+            }
 
-        var success = await _taskService.DeleteTaskAsync(id, userId);
+            int userId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+            var success = await _taskService.DeleteTaskAsync(id, userId);
 
-        if (!success)
-            return Forbid("You can only delete tasks that you created.");
+            if (!success)
+            {
+                // This handles if an Admin tries to delete a task they didn't create
+                return StatusCode(403, new { message = "You can only delete tasks that you personally created." });
+            }
 
-        return Ok(new { message = "Task deleted successfully" });
+            return Ok(new { message = "Task deleted successfully" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 }
