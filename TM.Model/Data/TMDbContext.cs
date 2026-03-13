@@ -1,6 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using TM.Model.Entities;
-using TM.Model.Data;
 using Task = TM.Model.Entities.Task;
 
 namespace TM.Model.Data

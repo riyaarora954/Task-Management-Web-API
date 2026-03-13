@@ -2,7 +2,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -16,14 +15,14 @@ namespace TM.ServiceLogic.Implementations
     public class AuthService : IAuthService
     {
         private readonly TMDbContext _context;
-        private readonly IConfiguration _config;
         private readonly IMapper _mapper;
+        private readonly IConfiguration _config;
 
-        public AuthService(TMDbContext context, IConfiguration config, IMapper mapper)
+        public AuthService(TMDbContext context, IMapper mapper, IConfiguration config)
         {
             _context = context;
-            _config = config;
             _mapper = mapper;
+            _config = config;
         }
 
         public async Task<AuthResponse?> RegisterAsync(RegisterRequest request)
@@ -31,17 +30,11 @@ namespace TM.ServiceLogic.Implementations
             if (await _context.Users.AnyAsync(u => u.Email == request.Email))
                 return null;
 
-            string normalizedRole = "User"; 
-            if (!string.IsNullOrWhiteSpace(request.Role))
+            string standardizedRole = "User";
+            if (!string.IsNullOrWhiteSpace(request.Role) &&
+                request.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
             {
-               
-                normalizedRole = char.ToUpper(request.Role[0]) + request.Role.Substring(1).ToLower();
-
-                
-                if (normalizedRole != "Admin" && normalizedRole != "User")
-                {
-                    normalizedRole = "User";
-                }
+                standardizedRole = "Admin";
             }
 
             var user = new User
@@ -49,33 +42,61 @@ namespace TM.ServiceLogic.Implementations
                 Email = request.Email,
                 Username = request.Username,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                Role = normalizedRole 
+                Role = standardizedRole
             };
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
-
-            var response = _mapper.Map<AuthResponse>(user);
-            response.Token = GenerateJwtToken(user);
-
-            return response;
+            return _mapper.Map<AuthResponse>(user);
         }
 
         public async Task<AuthResponse?> LoginAsync(LoginRequest request)
         {
-         
             var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == request.Email);
+                .FirstOrDefaultAsync(u => u.Email == request.Email && !u.IsDeleted);
 
             if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
-            {
                 return null;
-            }
 
             var response = _mapper.Map<AuthResponse>(user);
             response.Token = GenerateJwtToken(user);
-
             return response;
+        }
+
+        public async Task<IEnumerable<UserResponse>> GetUsersByRoleAsync(string role)
+        {
+            var users = await _context.Users
+                .Where(u => !u.IsDeleted && u.Role.ToLower() == role.ToLower())
+                .ToListAsync();
+
+            return _mapper.Map<IEnumerable<UserResponse>>(users);
+        }
+
+        public async Task<(bool Success, string Message)> SoftDeleteUserAsync(int id)
+        {
+            if (id <= 0) return (false, "Invalid user ID.");
+
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
+            if (user == null) return (false, "User not found.");
+
+            bool hasInProgress = await _context.Tasks.AnyAsync(t =>
+                t.AssignedToUserId == id &&
+                t.Status == TM.Model.Entities.TaskStatus.InProgress &&
+                !t.IsDeleted);
+
+            if (hasInProgress)
+                return (false, "User has tasks currently In Progress.");
+
+            bool isAssignedToAnything = await _context.Tasks.AnyAsync(t =>
+                t.AssignedToUserId == id && !t.IsDeleted);
+
+            if (isAssignedToAnything)
+                return (false, "User is still assigned to tasks. Please unassign them first.");
+
+            user.IsDeleted = true;
+            await _context.SaveChangesAsync();
+
+            return (true, "User deleted successfully.");
         }
 
         private string GenerateJwtToken(User user)
@@ -86,7 +107,7 @@ namespace TM.ServiceLogic.Implementations
             var claims = new[]
             {
                 new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role), 
+                new Claim(ClaimTypes.Role, user.Role),
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
             };
 

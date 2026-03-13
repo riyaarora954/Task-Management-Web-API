@@ -12,6 +12,7 @@ namespace TM.ServiceLogic.Mappings
         {
             CreateMap<User, AuthResponse>()
                 .ForMember(dest => dest.Token, opt => opt.Ignore());
+            CreateMap<User, UserResponse>();
 
             CreateMap<TM.Model.Entities.Task, TaskResponse>()
                 .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()))

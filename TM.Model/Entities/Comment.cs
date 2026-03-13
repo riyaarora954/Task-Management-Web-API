@@ -14,8 +14,6 @@ namespace TM.Model.Entities
 
         [ForeignKey("UserId")]
         public User? User { get; set; }
-
-        // SOFT DELETE FLAG
         public bool IsDeleted { get; set; } = false;
     }
 }
