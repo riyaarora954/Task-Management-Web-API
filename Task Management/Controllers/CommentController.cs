@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Security.Claims;
+using System.Threading.Tasks;
 using TM.Contracts.Comments;
 using TM.ServiceLogic.Interfaces;
 
@@ -23,21 +25,25 @@ namespace Task_Management.Controllers
         {
             try
             {
-                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+                // Safety check: Find the claim first to avoid CS8602 null warning
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized(new { message = "User identity not found." });
+
+                int userId = int.Parse(userIdClaim);
                 var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "User";
 
                 var result = await _commentService.AddCommentAsync(request, userId, role);
 
                 if (result == null)
                 {
-                    return Forbid("Only the task creator (Admin) or the assigned user can comment.");
+                    return StatusCode(403, new { message = "Cannot add comment. Task may be deleted or you do not have permission." });
                 }
 
                 return Ok(result);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"An error occurred while creating the comment: {ex.Message}");
+                return StatusCode(500, new { message = "Error creating comment.", error = ex.Message });
             }
         }
 
@@ -47,25 +53,24 @@ namespace Task_Management.Controllers
             try
             {
                 var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized(new { message = "User identity not found." });
+
+                int userId = int.Parse(userIdClaim);
                 var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "User";
 
-                if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized();
-                int currentUserId = int.Parse(userIdClaim);
-
-                var result = await _commentService.DeleteCommentAsync(id, currentUserId, role);
+                var result = await _commentService.DeleteCommentAsync(id, userId, role);
 
                 if (result == null)
-                    return NotFound("Comment not found.");
+                    return NotFound(new { message = "Comment not found or the associated task has been deleted." });
 
                 if (result == false)
-                    return Forbid("You can only delete your own comments, unless you are the Admin who created this task.");
+                    return StatusCode(403, new { message = "You can only delete your own comments." });
 
-                // CHANGE THIS LINE:
-                return Ok(new { message = "Comment deleted successfully." });
+                return NoContent();
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"An error occurred while deleting the comment: {ex.Message}");
+                return StatusCode(500, new { message = "Error deleting comment.", error = ex.Message });
             }
         }
 
@@ -74,43 +79,53 @@ namespace Task_Management.Controllers
         {
             try
             {
-                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized(new { message = "User identity not found." });
+
+                int userId = int.Parse(userIdClaim);
                 var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "User";
 
                 var comments = await _commentService.GetCommentsByTaskIdAsync(taskId, userId, role);
 
                 if (comments == null)
                 {
-                    return Forbid("You do not have permission to view comments for this task.");
+                    return NotFound(new { message = "The associated task does not exist or has been deleted." });
                 }
 
                 return Ok(comments);
             }
+            catch (UnauthorizedAccessException)
+            {
+                return StatusCode(403, new { message = "You do not have permission to view comments for this task." });
+            }
             catch (Exception ex)
             {
-                return StatusCode(500, $"An error occurred while fetching comments: {ex.Message}");
+                return StatusCode(500, new { message = "Error fetching comments.", error = ex.Message });
             }
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] CommentRequest request)
+        public async Task<IActionResult> Update(int id, [FromBody] CommentUpdateRequest request)
         {
             try
             {
-                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value!);
+                var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized(new { message = "User identity not found." });
+
+                int userId = int.Parse(userIdClaim);
 
                 var result = await _commentService.UpdateCommentAsync(id, request, userId);
 
                 if (result == null)
                 {
-                    return Forbid("You can only edit your own comments.");
+                    return NotFound(new { message = "Update failed. Comment/Task not found or you are not the author." });
                 }
 
                 return Ok(result);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"An error occurred while updating the comment: {ex.Message}");
+                return StatusCode(500, new { message = "Error updating comment.", error = ex.Message });
             }
         }
     }

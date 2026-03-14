@@ -14,10 +14,21 @@ namespace TM.Model.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // This line fixes your migration error by keeping the DB column as text
             modelBuilder.Entity<User>()
                 .Property(u => u.Role)
                 .HasConversion<string>();
+
+            // SEEDING LOGIC
+            modelBuilder.Entity<User>().HasData(new User
+            {
+                Id = 99,
+                Username = "superadmin",
+                Email = "superadmin@jira.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("SuperAdmin123"),
+                Role = UserRole.SuperAdmin,
+                CreatedAt = DateTime.UtcNow,
+                IsDeleted = false
+            });
         }
     }
 }

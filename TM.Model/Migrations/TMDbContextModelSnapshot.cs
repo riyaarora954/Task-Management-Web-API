@@ -37,6 +37,9 @@ namespace TM.Model.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<int>("TaskId")
                         .HasColumnType("int");
 
@@ -76,6 +79,9 @@ namespace TM.Model.Migrations
                     b.Property<DateTime?>("DueDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
@@ -105,6 +111,9 @@ namespace TM.Model.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -120,6 +129,18 @@ namespace TM.Model.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Users");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 99,
+                            CreatedAt = new DateTime(2026, 3, 14, 5, 18, 51, 140, DateTimeKind.Utc).AddTicks(1595),
+                            Email = "superadmin@jira.com",
+                            IsDeleted = false,
+                            PasswordHash = "$2a$11$KkvZ2xreI5YUC4FMAtkbk./7T4Mrr0AjLQGX24nEEn9/4W4XqgGfO",
+                            Role = "SuperAdmin",
+                            Username = "superadmin"
+                        });
                 });
 
             modelBuilder.Entity("TM.Model.Entities.Comment", b =>

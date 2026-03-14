@@ -14,8 +14,8 @@ namespace TM.ServiceLogic.Mappings
         {
             // 1. User Mappings (Handles UserRole Enum to String)
             CreateMap<User, AuthResponse>()
-                .ForMember(dest => dest.Token, opt => opt.Ignore())
-                .ForMember(dest => dest.Role, opt => opt.MapFrom(src => src.Role.ToString()));
+                .ForMember(dest => dest.Token, opt => opt.Ignore());
+            CreateMap<User, UserResponse>();
 
             // 2. Task Mappings (Handles Status Enum, Assigned Name, and DueDate)
             CreateMap<TaskEntity, TaskResponse>()
