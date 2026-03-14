@@ -84,6 +84,26 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+
+app.UseRouting();
+
+
+app.Use(async (context, next) =>
+{
+    await next();
+
+    if (context.Response.StatusCode == 401 && !context.Response.HasStarted)
+    {
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new { message = "Authentication failed: No token provided or token is invalid." });
+    }
+    else if (context.Response.StatusCode == 403 && !context.Response.HasStarted)
+    {
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new { message = "Access Denied: You do not have the required permissions for this action." });
+    }
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 

@@ -37,9 +37,7 @@ namespace TM.ServiceLogic.Implementations
         public async Task<TaskResponse> CreateTaskAsync(TaskCreateRequest request, int adminId)
         {
             var task = _mapper.Map<TM.Model.Entities.Task>(request);
-
             task.AssignedToUserId = (request.AssignedToUserId == 0) ? null : request.AssignedToUserId;
-
             task.Status = TM.Model.Entities.TaskStatus.Pending;
             task.CreatedBy = adminId;
             task.IsDeleted = false;
@@ -91,31 +89,54 @@ namespace TM.ServiceLogic.Implementations
 
         public async Task<TaskResponse?> UpdateTaskAsync(int id, TaskUpdateRequest request, int userId)
         {
-            var task = await _context.Tasks.FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted);
+            // 1. Check if the task even exists in the DB (ignore IsDeleted for a moment)
+            var task = await _context.Tasks.FirstOrDefaultAsync(t => t.Id == id);
 
-            if (task == null || task.CreatedBy != userId) return null;
+            // 2. If it's null or marked as deleted, throw an exception that the controller can catch
+            if (task == null || task.IsDeleted)
+                throw new KeyNotFoundException("Task does not exist.");
+
+            // 3. Permission check
+            if (task.CreatedBy != userId)
+                throw new UnauthorizedAccessException("Only the task creator can update task details.");
+
+            if (task.Status == TM.Model.Entities.TaskStatus.Completed)
+                throw new InvalidOperationException("This task is marked as Completed and cannot be edited.");
 
             task.Title = request.Title;
             task.Description = request.Description;
-
             task.AssignedToUserId = (request.AssignedToUserId == 0) ? null : request.AssignedToUserId;
 
             await _context.Entry(task).Reference(t => t.AssignedUser).LoadAsync();
+            await _context.SaveChangesAsync();
 
             return _mapper.Map<TaskResponse>(task);
         }
 
         public async Task<bool?> DeleteTaskAsync(int id, int userId)
         {
-            var task = await _context.Tasks.FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted);
+            // Find task and include its comments
+            var task = await _context.Tasks
+                .Include(t => t.Comments)
+                .FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted);
 
-            if (task == null || task.CreatedBy != userId) return null;
+            if (task == null) return null; // Task doesn't exist
 
-            if (task.Status != TM.Model.Entities.TaskStatus.Pending) return false;
+            if (task.CreatedBy != userId) return false; // Permission denied
 
+            // Soft delete the task
             task.IsDeleted = true;
-            await _context.SaveChangesAsync();
 
+            // Soft delete all associated comments to avoid DB confusion
+            if (task.Comments != null)
+            {
+                foreach (var comment in task.Comments)
+                {
+                    comment.IsDeleted = true;
+                }
+            }
+
+            await _context.SaveChangesAsync();
             return true;
         }
     }

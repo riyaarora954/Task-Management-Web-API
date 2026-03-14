@@ -2,9 +2,13 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using System;
+using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Text;
+using System.Threading.Tasks;
 using TM.Contracts.Auth;
 using TM.Model.Data;
 using TM.Model.Entities;
@@ -27,93 +31,121 @@ namespace TM.ServiceLogic.Implementations
 
         public async Task<AuthResponse?> RegisterAsync(RegisterRequest request)
         {
-            if (await _context.Users.AnyAsync(u => u.Email == request.Email))
-                return null;
-
-            string standardizedRole = "User";
-            if (!string.IsNullOrWhiteSpace(request.Role) &&
-                request.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+            try
             {
-                standardizedRole = "Admin";
+                if (await _context.Users.AnyAsync(u => u.Email == request.Email))
+                    return null;
+
+                if (!Enum.TryParse<UserRole>(request.Role, true, out var assignedRole))
+                {
+                    assignedRole = UserRole.User;
+                }
+
+                var user = new User
+                {
+                    Email = request.Email,
+                    Username = request.Username,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                    Role = assignedRole,
+                    CreatedAt = DateTime.UtcNow,
+                    IsDeleted = false
+                };
+
+                _context.Users.Add(user);
+                await _context.SaveChangesAsync();
+
+                return _mapper.Map<AuthResponse>(user);
             }
-
-            var user = new User
+            catch (Exception ex)
             {
-                Email = request.Email,
-                Username = request.Username,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                Role = standardizedRole
-            };
-
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
-            return _mapper.Map<AuthResponse>(user);
+                // Simple logging or rethrow to be caught by Controller
+                throw new Exception($"Service Error: Unable to register user. {ex.Message}");
+            }
         }
 
         public async Task<AuthResponse?> LoginAsync(LoginRequest request)
         {
-            var user = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email == request.Email && !u.IsDeleted);
+            try
+            {
+                var user = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Email == request.Email && !u.IsDeleted);
 
-            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
-                return null;
+                if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+                    return null;
 
-            var response = _mapper.Map<AuthResponse>(user);
-            response.Token = GenerateJwtToken(user);
-            return response;
+                var response = _mapper.Map<AuthResponse>(user);
+                response.Token = GenerateJwtToken(user);
+                return response;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Service Error: Login failed. {ex.Message}");
+            }
         }
 
         public async Task<IEnumerable<UserResponse>> GetUsersByRoleAsync(string role)
         {
-            var users = await _context.Users
-                .Where(u => !u.IsDeleted && u.Role.ToLower() == role.ToLower())
-                .ToListAsync();
+            try
+            {
+                if (!Enum.TryParse<UserRole>(role, true, out var roleEnum))
+                    return Enumerable.Empty<UserResponse>();
 
-            return _mapper.Map<IEnumerable<UserResponse>>(users);
+                var users = await _context.Users
+                    .Where(u => !u.IsDeleted && u.Role == roleEnum)
+                    .ToListAsync();
+
+                // If list is empty, return an empty enumerable instead of null
+                return _mapper.Map<IEnumerable<UserResponse>>(users) ?? Enumerable.Empty<UserResponse>();
+            }
+            catch (Exception ex)
+            {
+                // Returning empty ensures the app doesn't crash, but controller can check .Any()
+                throw new Exception($"Service Error: Could not fetch users for role {role}. {ex.Message}");
+            }
         }
 
         public async Task<(bool Success, string Message)> SoftDeleteUserAsync(int id)
         {
-            if (id <= 0) return (false, "Invalid user ID.");
-
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
-            if (user == null) return (false, "User not found.");
-
-            bool hasInProgress = await _context.Tasks.AnyAsync(t =>
-                t.AssignedToUserId == id &&
-                t.Status == TM.Model.Entities.TaskStatus.InProgress &&
-                !t.IsDeleted);
-
-            if (hasInProgress)
-                return (false, "User has tasks currently In Progress.");
-
-            bool isAssignedToAnything = await _context.Tasks.AnyAsync(t =>
-                t.AssignedToUserId == id && !t.IsDeleted);
-
-            if (user.Role.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+            try
             {
-                return (false, "Security Restriction: Admins cannot be deleted through this endpoint.");
+                if (id <= 0) return (false, "Invalid user ID.");
+
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
+                if (user == null) return (false, "User not found.");
+
+                if (user.Role == UserRole.SuperAdmin)
+                    return (false, "The SuperAdmin cannot be deleted.");
+
+                bool isAssignedToAnything = await _context.Tasks.AnyAsync(t =>
+                    t.AssignedToUserId == id && !t.IsDeleted);
+
+                if (isAssignedToAnything)
+                    return (false, "User is still assigned to tasks. Please unassign them first.");
+
+                user.IsDeleted = true;
+                await _context.SaveChangesAsync();
+
+                return (true, "User deleted successfully.");
             }
-
-            if (isAssignedToAnything)
-                return (false, "User is still assigned to tasks. Please unassign them first.");
-
-            user.IsDeleted = true;
-            await _context.SaveChangesAsync();
-
-            return (true, "User deleted successfully.");
+            catch (Exception ex)
+            {
+                return (false, $"Internal Error: {ex.Message}");
+            }
         }
 
         private string GenerateJwtToken(User user)
         {
-            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
+            var key = _config["Jwt:Key"];
+            if (string.IsNullOrEmpty(key)) throw new Exception("JWT Key is missing in configuration.");
+
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
             var claims = new[]
             {
-                new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, user.Role),
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
+                new System.Security.Claims.Claim(ClaimTypes.Name, user.Username),
+                new System.Security.Claims.Claim(ClaimTypes.Role, user.Role.ToString()),
+                new System.Security.Claims.Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
             };
 
             var token = new JwtSecurityToken(
