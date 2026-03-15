@@ -1,8 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System;
 using System.Security.Claims;
-using System.Threading.Tasks;
 using TM.Contracts.Tasks;
 using TM.ServiceLogic.Interfaces;
 
@@ -16,12 +14,12 @@ namespace Task_Management.Controllers
         private readonly ITaskService _taskService;
         public TasksController(ITaskService taskService) => _taskService = taskService;
 
+        //GetById EndPoint
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
             try
             {
-                // Safety check for claims to resolve CS8602
                 var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized(new { message = "User identity not found." });
 
@@ -43,6 +41,7 @@ namespace Task_Management.Controllers
             }
         }
 
+        //Create EndPoint
         [HttpPost]
         [ProducesResponseType(typeof(TaskResponse), 200)]
         public async Task<IActionResult> Create([FromBody] TaskCreateRequest request)
@@ -68,6 +67,7 @@ namespace Task_Management.Controllers
             }
         }
 
+        //UpdateStatus EndPoint
         [HttpPatch("{id}/status")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] TaskStatusRequest request)
         {
@@ -81,7 +81,6 @@ namespace Task_Management.Controllers
 
                 var success = await _taskService.UpdateStatusAsync(id, request.Status, userId, userRole);
 
-                // FIX: Replaced Forbid() with StatusCode(403) to prevent the "clumsy" crash
                 if (!success)
                 {
                     return StatusCode(403, new { message = "You do not have permission to update this status or the task is deleted." });
@@ -95,6 +94,7 @@ namespace Task_Management.Controllers
             }
         }
 
+        //GetAll EndPoint
         [HttpGet("/api/Users/Tasks")]
         public async Task<IActionResult> GetAll()
         {
@@ -114,6 +114,7 @@ namespace Task_Management.Controllers
             }
         }
 
+        //Update EndPoint
         [HttpPut("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(int id, [FromBody] TaskUpdateRequest request)
@@ -145,6 +146,7 @@ namespace Task_Management.Controllers
             }
         }
 
+        //Delete EndPoint
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)

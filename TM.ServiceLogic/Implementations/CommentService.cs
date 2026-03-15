@@ -1,9 +1,5 @@
 ﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using TM.Contracts.Comments;
 using TM.Model.Data;
 using TM.Model.Entities;
@@ -12,6 +8,7 @@ using TM.ServiceLogic.Interfaces;
 namespace TM.ServiceLogic.Implementations
 {
     public class CommentService : ICommentService
+
     {
         private readonly TMDbContext _context;
         private readonly IMapper _mapper;
@@ -22,6 +19,7 @@ namespace TM.ServiceLogic.Implementations
             _mapper = mapper;
         }
 
+        // Admins can comment on their own tasks, and assigned users can comment on tasks assigned to them.
         public async Task<CommentResponse?> AddCommentAsync(CommentRequest request, int currentUserId, string role)
         {
             var task = await _context.Tasks.FirstOrDefaultAsync(t => t.Id == request.TaskId && !t.IsDeleted);
@@ -48,11 +46,11 @@ namespace TM.ServiceLogic.Implementations
             return _mapper.Map<CommentResponse>(savedComment);
         }
 
+        // Admins can delete their own comments, and assigned users can delete their own comments on tasks assigned to them.
         public async Task<bool?> DeleteCommentAsync(int commentId, int currentUserId, string role)
         {
             var comment = await _context.Comments.Include(c => c.Task).FirstOrDefaultAsync(c => c.Id == commentId && !c.IsDeleted);
 
-            // If comment is null OR the associated task is deleted, consider it "Not Found"
             if (comment == null || comment.Task == null || comment.Task.IsDeleted) return null;
 
             bool isAuthor = (comment.UserId == currentUserId);
@@ -67,18 +65,15 @@ namespace TM.ServiceLogic.Implementations
             return false;
         }
 
+        // Admins can view comments on their own tasks, and assigned users can view comments on tasks assigned to them.
         public async Task<IEnumerable<CommentResponse>?> GetCommentsByTaskIdAsync(int taskId, int currentUserId, string role)
         {
-            // First, check the task state
             var task = await _context.Tasks.FirstOrDefaultAsync(t => t.Id == taskId);
-
-            // If task doesn't exist or is soft-deleted, return null (Controller will show "Task Not Found")
             if (task == null || task.IsDeleted) return null;
 
             bool isCreator = (role == "Admin" && task.CreatedBy == currentUserId);
             bool isAssigned = (task.AssignedToUserId == currentUserId);
 
-            // If task exists but user has no access, throw specific error for the controller to catch
             if (!isCreator && !isAssigned) throw new UnauthorizedAccessException();
 
             var comments = await _context.Comments
@@ -90,18 +85,16 @@ namespace TM.ServiceLogic.Implementations
             return _mapper.Map<IEnumerable<CommentResponse>>(comments);
         }
 
+        // Admins can update their own comments, and assigned users can update their own comments on tasks assigned to them.
         public async Task<CommentResponse?> UpdateCommentAsync(int commentId, CommentUpdateRequest request, int currentUserId)
         {
-            // Check if comment exists AND the task it belongs to is not deleted
             var comment = await _context.Comments
                 .Include(c => c.User)
                 .Include(c => c.Task)
                 .FirstOrDefaultAsync(c => c.Id == commentId && !c.IsDeleted);
 
-            // If task is deleted, the comment is considered inaccessible
             if (comment == null || comment.Task == null || comment.Task.IsDeleted) return null;
 
-            // Only the person who wrote the comment can edit it
             if (comment.UserId != currentUserId) return null;
 
             comment.Content = request.Content;

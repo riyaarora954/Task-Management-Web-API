@@ -25,6 +25,7 @@ namespace TM.ServiceLogic.Implementations
             _config = config;
         }
 
+        // The RegisterAsync method checks if the email is already registered, hashes the password, assigns a role, and saves the new user to the database. It returns an AuthResponse with user details if successful, or null if the email is already in use.
         public async Task<AuthResponse?> RegisterAsync(RegisterRequest request)
         {
             try
@@ -55,11 +56,11 @@ namespace TM.ServiceLogic.Implementations
             }
             catch (Exception ex)
             {
-                // Simple logging or rethrow to be caught by Controller
                 throw new Exception($"Service Error: Unable to register user. {ex.Message}");
             }
         }
 
+        // Verifies credentials, generates a JWT token upon success, and returns user details.
         public async Task<AuthResponse?> LoginAsync(LoginRequest request)
         {
             try
@@ -80,6 +81,7 @@ namespace TM.ServiceLogic.Implementations
             }
         }
 
+        // Retrieves users by role, ensuring that if the role is invalid or no users are found, an empty enumerable is returned instead of null.
         public async Task<IEnumerable<UserResponse>> GetUsersByRoleAsync(string role)
         {
             try
@@ -91,16 +93,15 @@ namespace TM.ServiceLogic.Implementations
                     .Where(u => !u.IsDeleted && u.Role == roleEnum)
                     .ToListAsync();
 
-                // If list is empty, return an empty enumerable instead of null
                 return _mapper.Map<IEnumerable<UserResponse>>(users) ?? Enumerable.Empty<UserResponse>();
             }
             catch (Exception ex)
             {
-                // Returning empty ensures the app doesn't crash, but controller can check
                 throw new Exception($"Service Error: Could not fetch users for role {role}. {ex.Message}");
             }
         }
 
+        // Validates and soft-deletes a user after checking role restrictions and active task assignments.
         public async Task<(bool Success, string Message)> SoftDeleteUserAsync(int id)
         {
             try
@@ -130,6 +131,7 @@ namespace TM.ServiceLogic.Implementations
             }
         }
 
+        //Generates a JWT token
         private string GenerateJwtToken(User user)
         {
             var key = _config["Jwt:Key"];

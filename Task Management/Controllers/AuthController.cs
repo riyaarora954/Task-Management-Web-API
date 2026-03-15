@@ -16,6 +16,7 @@ namespace TM.WebAPI.Controllers
             _authService = authService;
         }
 
+        //Register Endpoint 
         [HttpPost("register")]
         [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
@@ -36,6 +37,7 @@ namespace TM.WebAPI.Controllers
             }
         }
 
+        //Login Endpoint
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
@@ -55,6 +57,7 @@ namespace TM.WebAPI.Controllers
             }
         }
 
+        //GetAllUsers EndPoint
         [HttpGet("users")]
         [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> GetAllUsers()
@@ -77,6 +80,7 @@ namespace TM.WebAPI.Controllers
             }
         }
 
+        //GetAllAdmins EndPoint
         [HttpGet("admins")]
         [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> GetAllAdmins()
@@ -100,6 +104,7 @@ namespace TM.WebAPI.Controllers
             }
         }
 
+        //Delete User EndPoint
         [HttpDelete("users/{id}")]
         [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> DeleteUser(int id)

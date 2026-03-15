@@ -87,7 +87,7 @@ app.UseHttpsRedirection();
 
 app.UseRouting();
 
-
+// Middleware to handle 401 and 403 responses and return consistent JSON error messages
 app.Use(async (context, next) =>
 {
     await next();
