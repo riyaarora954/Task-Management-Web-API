@@ -2,13 +2,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
-using System;
-using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
 using System.Security.Claims;
 using System.Text;
-using System.Threading.Tasks;
 using TM.Contracts.Auth;
 using TM.Model.Data;
 using TM.Model.Entities;
@@ -36,7 +32,8 @@ namespace TM.ServiceLogic.Implementations
                 if (await _context.Users.AnyAsync(u => u.Email == request.Email))
                     return null;
 
-                if (!Enum.TryParse<UserRole>(request.Role, true, out var assignedRole))
+                if (!Enum.TryParse<UserRole>(request.Role, true, out var 
+                    assignedRole))
                 {
                     assignedRole = UserRole.User;
                 }
@@ -99,7 +96,7 @@ namespace TM.ServiceLogic.Implementations
             }
             catch (Exception ex)
             {
-                // Returning empty ensures the app doesn't crash, but controller can check .Any()
+                // Returning empty ensures the app doesn't crash, but controller can check
                 throw new Exception($"Service Error: Could not fetch users for role {role}. {ex.Message}");
             }
         }

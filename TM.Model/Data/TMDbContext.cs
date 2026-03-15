@@ -21,7 +21,7 @@ namespace TM.Model.Data
             // SEEDING LOGIC
             modelBuilder.Entity<User>().HasData(new User
             {
-                Id = 99,
+                Id = 1,
                 Username = "superadmin",
                 Email = "superadmin@jira.com",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("SuperAdmin123"),

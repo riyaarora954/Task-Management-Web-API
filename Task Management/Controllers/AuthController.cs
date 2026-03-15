@@ -1,8 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using TM.Contracts.Auth;
 using TM.ServiceLogic.Interfaces;
 
@@ -17,54 +14,6 @@ namespace TM.WebAPI.Controllers
         public AuthController(IAuthService authService)
         {
             _authService = authService;
-        }
-
-        [HttpGet("users")]
-        [Authorize(Roles = "SuperAdmin")]
-        public async Task<IActionResult> GetAllUsers()
-        {
-            // Manual check for Authentication/Authorization message
-            if (User?.Identity?.IsAuthenticated != true)
-                return Unauthorized(new { message = "You are not authenticated. Please provide a valid token." });
-
-            try
-            {
-                var users = await _authService.GetUsersByRoleAsync("User");
-
-                // Handling empty database response
-                if (users == null || !users.Any())
-                    return NotFound(new { message = "No users found in the system." });
-
-                return Ok(users);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Error retrieving users.", error = ex.Message });
-            }
-        }
-
-        [HttpGet("admins")]
-        [Authorize(Roles = "SuperAdmin")]
-        public async Task<IActionResult> GetAllAdmins()
-        {
-            // Manual check for Authentication/Authorization message
-            if (User?.Identity?.IsAuthenticated != true)
-                return Unauthorized(new { message = "You are not authenticated. Please provide a valid token." });
-
-            try
-            {
-                var admins = await _authService.GetUsersByRoleAsync("Admin");
-
-                // Handling empty database response
-                if (admins == null || !admins.Any())
-                    return NotFound(new { message = "No admins found in the system." });
-
-                return Ok(admins);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "Error retrieving admins.", error = ex.Message });
-            }
         }
 
         [HttpPost("register")]
@@ -103,6 +52,51 @@ namespace TM.WebAPI.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "Login error.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("users")]
+        [Authorize(Roles = "SuperAdmin")]
+        public async Task<IActionResult> GetAllUsers()
+        {
+            if (User?.Identity?.IsAuthenticated != true)
+                return Unauthorized(new { message = "You are not authenticated. Please provide a valid token." });
+
+            try
+            {
+                var users = await _authService.GetUsersByRoleAsync("User");
+                // Handling empty database response
+                if (users == null || !users.Any())
+                    return NotFound(new { message = "No users found in the system." });
+
+                return Ok(users);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error retrieving users.", error = ex.Message });
+            }
+        }
+
+        [HttpGet("admins")]
+        [Authorize(Roles = "SuperAdmin")]
+        public async Task<IActionResult> GetAllAdmins()
+        {
+            if (User?.Identity?.IsAuthenticated != true)
+                return Unauthorized(new { message = "You are not authenticated. Please provide a valid token." });
+
+            try
+            {
+                var admins = await _authService.GetUsersByRoleAsync("Admin");
+
+                // Handling empty database response
+                if (admins == null || !admins.Any())
+                    return NotFound(new { message = "No admins found in the system." });
+
+                return Ok(admins);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error retrieving admins.", error = ex.Message });
             }
         }
 

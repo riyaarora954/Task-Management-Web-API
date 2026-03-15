@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using TM.Contracts.Tasks;
 using TM.Model.Data;
+using TM.Model.Entities;
 using TM.ServiceLogic.Interfaces;
 
 namespace TM.ServiceLogic.Implementations
@@ -36,7 +37,18 @@ namespace TM.ServiceLogic.Implementations
 
         public async Task<TaskResponse> CreateTaskAsync(TaskCreateRequest request, int adminId)
         {
+            if (request.AssignedToUserId != 0)
+            {
+                var targetUser = await _context.Users.FindAsync(request.AssignedToUserId);
+
+                if (targetUser == null || targetUser.Role == UserRole.Admin || targetUser.Role == UserRole.SuperAdmin)
+                {
+                    throw new Exception("Tasks can only be assigned to regular Users, not Admins or SuperAdmins.");
+                }
+            }
+
             var task = _mapper.Map<TM.Model.Entities.Task>(request);
+
             task.AssignedToUserId = (request.AssignedToUserId == 0) ? null : request.AssignedToUserId;
             task.Status = TM.Model.Entities.TaskStatus.Pending;
             task.CreatedBy = adminId;
