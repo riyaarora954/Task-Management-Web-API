@@ -20,12 +20,12 @@ namespace Task_Management.Controllers
             _commentService = commentService;
         }
 
+        //Create Endpoint
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CommentRequest request)
         {
             try
             {
-                // Safety check: Find the claim first to avoid CS8602 null warning
                 var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 if (string.IsNullOrEmpty(userIdClaim)) return Unauthorized(new { message = "User identity not found." });
 
@@ -47,6 +47,7 @@ namespace Task_Management.Controllers
             }
         }
 
+        //Delete Endpoint
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -74,6 +75,7 @@ namespace Task_Management.Controllers
             }
         }
 
+        //GetByTaskId Endpoint
         [HttpGet("task/{taskId}")]
         public async Task<IActionResult> GetByTaskId(int taskId)
         {
@@ -104,6 +106,7 @@ namespace Task_Management.Controllers
             }
         }
 
+        //Update Endpoint
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] CommentUpdateRequest request)
         {

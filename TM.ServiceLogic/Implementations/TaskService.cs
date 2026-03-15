@@ -37,6 +37,11 @@ namespace TM.ServiceLogic.Implementations
 
         public async Task<TaskResponse> CreateTaskAsync(TaskCreateRequest request, int adminId)
         {
+
+            bool exists = await _context.Tasks.AnyAsync(t =>
+            t.Title.ToLower() == request.Title.ToLower() && !t.IsDeleted);
+
+            
             if (request.AssignedToUserId != 0)
             {
                 var targetUser = await _context.Users.FindAsync(request.AssignedToUserId);
@@ -45,6 +50,14 @@ namespace TM.ServiceLogic.Implementations
                 {
                     throw new Exception("Tasks can only be assigned to regular Users, not Admins or SuperAdmins.");
                 }
+                if (targetUser.IsDeleted)
+                {
+                    throw new Exception("User doesn't exists.");
+                }
+            }
+            if (exists)
+            {
+                throw new InvalidOperationException("This task already exists and is assigned to someone. You cannot create it again.");
             }
 
             var task = _mapper.Map<TM.Model.Entities.Task>(request);
@@ -101,14 +114,11 @@ namespace TM.ServiceLogic.Implementations
 
         public async Task<TaskResponse?> UpdateTaskAsync(int id, TaskUpdateRequest request, int userId)
         {
-            // 1. Check if the task even exists in the DB (ignore IsDeleted for a moment)
             var task = await _context.Tasks.FirstOrDefaultAsync(t => t.Id == id);
 
-            // 2. If it's null or marked as deleted, throw an exception that the controller can catch
             if (task == null || task.IsDeleted)
                 throw new KeyNotFoundException("Task does not exist.");
 
-            // 3. Permission check
             if (task.CreatedBy != userId)
                 throw new UnauthorizedAccessException("Only the task creator can update task details.");
 
@@ -127,19 +137,15 @@ namespace TM.ServiceLogic.Implementations
 
         public async Task<bool?> DeleteTaskAsync(int id, int userId)
         {
-            // Find task and include its comments
             var task = await _context.Tasks
                 .Include(t => t.Comments)
                 .FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted);
 
-            if (task == null) return null; // Task doesn't exist
+            if (task == null) return null; 
 
-            if (task.CreatedBy != userId) return false; // Permission denied
+            if (task.CreatedBy != userId) return false; 
 
-            // Soft delete the task
             task.IsDeleted = true;
-
-            // Soft delete all associated comments to avoid DB confusion
             if (task.Comments != null)
             {
                 foreach (var comment in task.Comments)
