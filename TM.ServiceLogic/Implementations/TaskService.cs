@@ -37,10 +37,6 @@ namespace TM.ServiceLogic.Implementations
 
         public async Task<TaskResponse> CreateTaskAsync(TaskCreateRequest request, int adminId)
         {
-
-            bool exists = await _context.Tasks.AnyAsync(t =>
-            t.Title.ToLower() == request.Title.ToLower() && !t.IsDeleted);
-
             
             if (request.AssignedToUserId != 0)
             {
@@ -54,10 +50,6 @@ namespace TM.ServiceLogic.Implementations
                 {
                     throw new Exception("User doesn't exists.");
                 }
-            }
-            if (exists)
-            {
-                throw new InvalidOperationException("This task already exists and is assigned to someone. You cannot create it again.");
             }
 
             var task = _mapper.Map<TM.Model.Entities.Task>(request);

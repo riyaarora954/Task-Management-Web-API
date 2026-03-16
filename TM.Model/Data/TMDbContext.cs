@@ -17,9 +17,6 @@ namespace TM.Model.Data
             modelBuilder.Entity<User>()
                 .Property(u => u.Role)
                 .HasConversion<string>();
-            modelBuilder.Entity<Task>()
-                .HasIndex(t => t.Title)
-                .IsUnique();
 
             // SEEDING LOGIC
             modelBuilder.Entity<User>().HasData(new User
