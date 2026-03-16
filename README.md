@@ -1,7 +1,7 @@
-Task Management Web API
+Task Management Web API:
 A robust backend system built with ASP.NET Core and Entity Framework Core for managing user tasks. This API features a hierarchical role-based system (Admin/User), JWT authentication, and advanced task assignment logic.
 
-Features
+Features:
 Secure Authentication: JWT-based login and registration system using BCrypt for password hashing.
 
 Role-Based Access Control (RBAC): Distinct permissions for Admin and User roles.
@@ -18,7 +18,7 @@ Admin Protection: Built-in security check to prevent Admins from deleting other 
 
 Unassigned Task Support: Uses 0 as a default unassigned state, mapping to NULL in the database for better logic handling.
 
-Tech Stack
+Tech Stack:
 Framework: .NET 8 / ASP.NET Core Web API
 
 Database: Microsoft SQL Server (MSSQL)
