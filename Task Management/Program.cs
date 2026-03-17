@@ -52,7 +52,11 @@ try
             {
                 new OpenApiSecurityScheme
                 {
-                    Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+                    Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "Bearer"
+                    }
                 },
                 new string[] { }
             }
@@ -89,30 +93,68 @@ try
 
     var app = builder.Build();
 
-    // 3. SEEDING DATA WITH BOGUS
-    // NOTE: SuperAdmin (Id = 1) is already seeded via TMDbContext.OnModelCreating HasData.
-    //       Here we only add the 10,000 regular fake users.
+    // ─────────────────────────────────────────────
+    // DATABASE SEEDING
+    // ─────────────────────────────────────────────
     using (var scope = app.Services.CreateScope())
     {
         var services = scope.ServiceProvider;
         var context = services.GetRequiredService<TMDbContext>();
 
-        // <= 1 means only the SuperAdmin from HasData exists — no fake users yet
-        if (context.Users.Count() < 1)
+        // STEP 1: Apply pending migrations
+        Log.Information("Applying pending migrations...");
+        await context.Database.MigrateAsync();
+        Log.Information("Migrations applied successfully.");
+
+        // STEP 2: Seed SuperAdmin ONLY if not already present
+        bool superAdminExists = await context.Users.AnyAsync(u => u.Role == UserRole.SuperAdmin);
+
+        if (!superAdminExists)
+        {
+            Log.Information("Seeding SuperAdmin user...");
+
+            var superAdmin = new User
+            {
+                Username = "superadmin",
+                Email = "superadmin@taskmanager.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("SuperAdmin@123"),
+                IsDeleted = false,
+                Role = UserRole.SuperAdmin,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            context.Users.Add(superAdmin);
+            await context.SaveChangesAsync();
+
+            Log.Information("SuperAdmin seeded. Email: superadmin@taskmanager.com | Password: SuperAdmin@123");
+        }
+        else
+        {
+            Log.Information("SuperAdmin already exists. Skipping.");
+        }
+
+        // STEP 3: Reseed identity counter so fake users follow SuperAdmin's Id
+        // This ensures the next inserted row gets the correct next Id
+        Log.Information("Reseeding identity counter...");
+        await context.Database.ExecuteSqlRawAsync("DBCC CHECKIDENT ('Users', RESEED, 1)");
+        Log.Information("Identity counter reset successfully.");
+
+        // STEP 4: Seed 10,000 fake users ONLY if they don't already exist
+        bool fakeUsersExist = await context.Users.AnyAsync(u => u.Role != UserRole.SuperAdmin);
+
+        if (!fakeUsersExist)
         {
             Log.Information("Seeding 10,000 fake users via Bogus...");
 
-            // FIX: Use BCrypt.Net — same library used by TMDbContext and AuthService.
-            //      Hash the password ONCE and reuse the string for all 10,000 users.
-            //      Hashing once vs 10,000 times = seeding completes in seconds not minutes.
+            // Hash password ONCE and reuse — saves enormous time vs hashing 10,000 times
             const string commonPwd = "Test@123";
             string hashedPassword = BCrypt.Net.BCrypt.HashPassword(commonPwd);
 
-            // SuperAdmin is excluded — only Admin and User roles assigned by Bogus
+            // Only Admin and User roles assigned to fake users
             var userFaker = new Faker<User>()
                 .RuleFor(u => u.Username, f => f.Internet.UserName().ToLower())
                 .RuleFor(u => u.Email, (f, u) => f.Internet.Email(u.Username))
-                .RuleFor(u => u.PasswordHash, _ => hashedPassword) // Same BCrypt hash reused
+                .RuleFor(u => u.PasswordHash, _ => hashedPassword)
                 .RuleFor(u => u.IsDeleted, _ => false)
                 .RuleFor(u => u.Role, f => f.PickRandom(UserRole.Admin, UserRole.User))
                 .RuleFor(u => u.CreatedAt, f => f.Date.Past(1));
@@ -121,31 +163,37 @@ try
             context.Database.SetCommandTimeout(600);
 
             const int batchSize = 1000;
-            const int total = 10000;
+            const int total = 10_000;
 
             for (int i = 0; i < total; i += batchSize)
             {
                 var batch = userFaker.Generate(Math.Min(batchSize, total - i));
                 context.Users.AddRange(batch);
-                context.SaveChanges();
-                Log.Information("Seeded {Done}/{Total} users...", i + batch.Count, total);
+                await context.SaveChangesAsync();
+                Log.Information("Seeded {Done}/{Total} fake users...", i + batch.Count, total);
             }
 
-            Log.Information("Seeding complete! All 10,000 users — Password: {Pwd}", commonPwd);
+            Log.Information("Seeding complete! 10,000 fake users added. Password: {Pwd}", commonPwd);
         }
         else
         {
-            Log.Information("Users table already has data. Skipping Bogus seed.");
+            Log.Information("Fake users already exist. Skipping Bogus seed.");
         }
     }
 
-    if (app.Environment.IsDevelopment())
-    {
-        app.UseSwagger();
-        app.UseSwaggerUI();
-    }
+    // ─────────────────────────────────────────────
+    // MIDDLEWARE PIPELINE
+    // ─────────────────────────────────────────────
 
-    // 4. LOGGING MIDDLEWARE (Tracks speed/time for all APIs)
+    // Always enable Swagger
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "TaskManagementAPI v1");
+        c.RoutePrefix = "swagger"; // Access at: https://localhost:{port}/swagger/index.html
+    });
+
+    // Serilog Request Logging Middleware
     app.UseSerilogRequestLogging(options =>
     {
         options.MessageTemplate =
@@ -155,22 +203,23 @@ try
     app.UseHttpsRedirection();
     app.UseRouting();
 
-    // Consistency Middleware for 401/403
-    app.Use(async (context, next) =>
+    // Consistency Middleware for 401 / 403 responses
+    app.Use(async (httpContext, next) =>
     {
         await next();
-        if (context.Response.StatusCode == 401 && !context.Response.HasStarted)
+
+        if (httpContext.Response.StatusCode == 401 && !httpContext.Response.HasStarted)
         {
-            context.Response.ContentType = "application/json";
-            await context.Response.WriteAsJsonAsync(new
+            httpContext.Response.ContentType = "application/json";
+            await httpContext.Response.WriteAsJsonAsync(new
             {
                 message = "Authentication failed: No token provided or token is invalid."
             });
         }
-        else if (context.Response.StatusCode == 403 && !context.Response.HasStarted)
+        else if (httpContext.Response.StatusCode == 403 && !httpContext.Response.HasStarted)
         {
-            context.Response.ContentType = "application/json";
-            await context.Response.WriteAsJsonAsync(new
+            httpContext.Response.ContentType = "application/json";
+            await httpContext.Response.WriteAsJsonAsync(new
             {
                 message = "Access Denied: You do not have the required permissions."
             });

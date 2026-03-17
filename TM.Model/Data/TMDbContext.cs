@@ -18,18 +18,9 @@ namespace TM.Model.Data
                 .Property(u => u.Role)
                 .HasConversion<string>();
 
-            // SEEDING LOGIC
-            modelBuilder.Entity<User>().HasData(new User
-
-            {
-                Id = 1,
-                Username = "superadmin",
-                Email = "superadmin@jira.com",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("SuperAdmin123"),
-                Role = UserRole.SuperAdmin,
-                CreatedAt = DateTime.UtcNow,
-                IsDeleted = false
-            });
+            // SuperAdmin is now seeded in Program.cs (Stage 2)
+            // using SET IDENTITY_INSERT to guarantee Id = 1
+            // before Bogus fake users are added.
         }
     }
 }
