@@ -20,6 +20,7 @@ namespace TM.Model.Data
 
             // SEEDING LOGIC
             modelBuilder.Entity<User>().HasData(new User
+
             {
                 Id = 1,
                 Username = "superadmin",

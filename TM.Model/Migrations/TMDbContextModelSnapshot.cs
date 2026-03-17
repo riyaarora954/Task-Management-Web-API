@@ -134,10 +134,10 @@ namespace TM.Model.Migrations
                         new
                         {
                             Id = 1,
-                            CreatedAt = new DateTime(2026, 3, 15, 14, 26, 9, 577, DateTimeKind.Utc).AddTicks(6113),
+                            CreatedAt = new DateTime(2026, 3, 17, 13, 11, 48, 906, DateTimeKind.Utc).AddTicks(819),
                             Email = "superadmin@jira.com",
                             IsDeleted = false,
-                            PasswordHash = "$2a$11$S3qWRwt8VTW/PNnkZj4Wjul2iVo83Z7QNQwTZ7HxY6UbVfZRRg3Vm",
+                            PasswordHash = "$2a$11$S8s2ByBRaDRnhJmFxeCAW.8ZegykS7.Y36O5C3AcbcUq1.xqn7WRe",
                             Role = "SuperAdmin",
                             Username = "superadmin"
                         });

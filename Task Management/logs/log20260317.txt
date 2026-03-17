@@ -1,0 +1,22 @@
+2026-03-17 17:15:06.990 +05:30 [INF] User profile is available. Using 'C:\Users\arora\AppData\Local\ASP.NET\DataProtection-Keys' as key repository and Windows DPAPI to encrypt keys at rest.
+2026-03-17 17:15:07.264 +05:30 [INF] Now listening on: https://localhost:7021
+2026-03-17 17:15:07.266 +05:30 [INF] Now listening on: http://localhost:5130
+2026-03-17 17:15:07.332 +05:30 [INF] Application started. Press Ctrl+C to shut down.
+2026-03-17 17:15:07.334 +05:30 [INF] Hosting environment: Development
+2026-03-17 17:15:07.334 +05:30 [INF] Content root path: C:\Users\arora\Desktop\TaskManagementAPI\Task Management
+2026-03-17 17:15:08.982 +05:30 [INF] Request starting HTTP/2 GET https://localhost:7021/swagger/index.html - null null
+2026-03-17 17:15:09.221 +05:30 [INF] HTTP GET /swagger/index.html responded 200 in 89.1098 ms
+2026-03-17 17:15:09.231 +05:30 [INF] Request starting HTTP/2 GET https://localhost:7021/_vs/browserLink - null null
+2026-03-17 17:15:09.231 +05:30 [INF] Request starting HTTP/2 GET https://localhost:7021/_framework/aspnetcore-browser-refresh.js - null null
+2026-03-17 17:15:09.232 +05:30 [INF] Request finished HTTP/2 GET https://localhost:7021/swagger/index.html - 200 null text/html;charset=utf-8 250.7939ms
+2026-03-17 17:15:09.264 +05:30 [INF] Request finished HTTP/2 GET https://localhost:7021/_framework/aspnetcore-browser-refresh.js - 200 16503 application/javascript; charset=utf-8 33.3466ms
+2026-03-17 17:15:09.311 +05:30 [INF] Request finished HTTP/2 GET https://localhost:7021/_vs/browserLink - 200 null text/javascript; charset=UTF-8 79.9147ms
+2026-03-17 17:15:09.356 +05:30 [INF] Request starting HTTP/2 GET https://localhost:7021/swagger/v1/swagger.json - null null
+2026-03-17 17:15:09.375 +05:30 [INF] HTTP GET /swagger/v1/swagger.json responded 200 in 16.7811 ms
+2026-03-17 17:15:09.378 +05:30 [INF] Request finished HTTP/2 GET https://localhost:7021/swagger/v1/swagger.json - 200 null application/json;charset=utf-8 22.2233ms
+2026-03-17 17:15:19.580 +05:30 [INF] Request starting HTTP/2 POST https://localhost:7021/api/Auth/register - application/json 101
+2026-03-17 17:15:19.664 +05:30 [INF] Authorization failed. These requirements were not met:
+RolesAuthorizationRequirement:User.IsInRole must be true for one of the following roles: (SuperAdmin)
+2026-03-17 17:15:19.671 +05:30 [INF] AuthenticationScheme: Bearer was challenged.
+2026-03-17 17:15:19.676 +05:30 [INF] HTTP POST /api/Auth/register responded 401 in 88.8661 ms
+2026-03-17 17:15:19.677 +05:30 [INF] Request finished HTTP/2 POST https://localhost:7021/api/Auth/register - 401 null application/json; charset=utf-8 97.1674ms
