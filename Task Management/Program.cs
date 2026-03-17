@@ -31,7 +31,6 @@ try
         .WriteTo.File("logs/task_management_log.txt", rollingInterval: RollingInterval.Day)
         .ReadFrom.Configuration(ctx.Configuration));
 
-    // Add services to the container
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
 
@@ -66,7 +65,6 @@ try
     builder.Services.AddDbContext<TMDbContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-    // Dependency Injection
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<ITaskService, TaskService>();
     builder.Services.AddScoped<ICommentService, CommentService>();
@@ -133,51 +131,132 @@ try
             Log.Information("SuperAdmin already exists. Skipping.");
         }
 
-        // STEP 3: Reseed identity counter so fake users follow SuperAdmin's Id
-        // This ensures the next inserted row gets the correct next Id
+        // STEP 3: Reseed identity counter
         Log.Information("Reseeding identity counter...");
         await context.Database.ExecuteSqlRawAsync("DBCC CHECKIDENT ('Users', RESEED, 1)");
         Log.Information("Identity counter reset successfully.");
 
-        // STEP 4: Seed 10,000 fake users ONLY if they don't already exist
+        // STEP 4: Seed 600,000 fake users ONLY if they don't already exist
         bool fakeUsersExist = await context.Users.AnyAsync(u => u.Role != UserRole.SuperAdmin);
 
         if (!fakeUsersExist)
         {
-            Log.Information("Seeding 10,000 fake users via Bogus...");
+            Log.Information("Seeding 600,000 fake users via Bogus...");
 
-            // Hash password ONCE and reuse — saves enormous time vs hashing 10,000 times
             const string commonPwd = "Test@123";
             string hashedPassword = BCrypt.Net.BCrypt.HashPassword(commonPwd);
 
-            // Only Admin and User roles assigned to fake users
             var userFaker = new Faker<User>()
-                .RuleFor(u => u.Username, f => f.Internet.UserName().ToLower())
-                .RuleFor(u => u.Email, (f, u) => f.Internet.Email(u.Username))
+                .RuleFor(u => u.Username, f => f.Internet.UserName().ToLower() + f.UniqueIndex)
+                .RuleFor(u => u.Email, (f, u) => $"{u.Username}@taskmanager.com")
                 .RuleFor(u => u.PasswordHash, _ => hashedPassword)
                 .RuleFor(u => u.IsDeleted, _ => false)
                 .RuleFor(u => u.Role, f => f.PickRandom(UserRole.Admin, UserRole.User))
                 .RuleFor(u => u.CreatedAt, f => f.Date.Past(1));
 
-            // Increase EF command timeout to 10 minutes for bulk inserts
             context.Database.SetCommandTimeout(600);
+            context.ChangeTracker.AutoDetectChangesEnabled = false;
 
-            const int batchSize = 1000;
-            const int total = 10_000;
+            const int userBatchSize = 2000;
+            const int totalUsers = 600_000;
 
-            for (int i = 0; i < total; i += batchSize)
+            for (int i = 0; i < totalUsers; i += userBatchSize)
             {
-                var batch = userFaker.Generate(Math.Min(batchSize, total - i));
+                var batch = userFaker.Generate(Math.Min(userBatchSize, totalUsers - i));
                 context.Users.AddRange(batch);
                 await context.SaveChangesAsync();
-                Log.Information("Seeded {Done}/{Total} fake users...", i + batch.Count, total);
+                context.ChangeTracker.Clear();
+                Log.Information("Seeded {Done}/{Total} fake users...", i + batch.Count, totalUsers);
             }
 
-            Log.Information("Seeding complete! 10,000 fake users added. Password: {Pwd}", commonPwd);
+            context.ChangeTracker.AutoDetectChangesEnabled = true;
+            Log.Information("User seeding complete! 600,000 fake users added. Password: {Pwd}", commonPwd);
         }
         else
         {
-            Log.Information("Fake users already exist. Skipping Bogus seed.");
+            Log.Information("Fake users already exist. Skipping user seed.");
+        }
+
+        // STEP 5: Seed 200,000 tasks ONLY if they don't already exist
+        // Every task has a DIFFERENT admin as creator — no admin is reused
+        bool tasksExist = await context.Tasks.AnyAsync();
+
+        if (!tasksExist)
+        {
+            Log.Information("Fetching Admin user Ids for task seeding...");
+
+            // Fetch only the first 200,000 admins — we need exactly one unique admin per task
+            var adminIds = await context.Users
+                .Where(u => u.Role == UserRole.Admin && !u.IsDeleted)
+                .Select(u => u.Id)
+                .Take(200_000)       // We only need 200k since we have 200k tasks
+                .ToListAsync();
+
+            if (adminIds.Count == 0)
+            {
+                Log.Warning("No Admin users found. Skipping task seeding.");
+            }
+            else
+            {
+                Log.Information("Found {Count} admins. Shuffling for unique assignment...", adminIds.Count);
+
+                // Shuffle admin list so assignment is random, not sequential
+                var rng = new Random();
+                adminIds = adminIds.OrderBy(_ => rng.Next()).ToList();
+
+                Log.Information("Shuffle complete. Starting task seeding...");
+
+                var faker = new Faker();
+
+                var taskStatuses = new[]
+                     {
+                        TM.Model.Entities.TaskStatus.Pending,
+                        TM.Model.Entities.TaskStatus.InProgress,
+                        TM.Model.Entities.TaskStatus.Completed
+                    };
+
+                context.ChangeTracker.AutoDetectChangesEnabled = false;
+                context.Database.SetCommandTimeout(600);
+
+                const int taskBatchSize = 1000;
+                const int totalTasks = 3_000;
+
+                for (int i = 0; i < totalTasks; i += taskBatchSize)
+                {
+                    int currentBatch = Math.Min(taskBatchSize, totalTasks - i);
+                    var tasks = new List<TM.Model.Entities.Task>(currentBatch);
+
+                    for (int j = 0; j < currentBatch; j++)
+                    {
+                        // Each task gets a completely unique admin — no repeats
+                        var adminId = adminIds[i + j];
+
+                        tasks.Add(new TM.Model.Entities.Task
+                        {
+                            Title = faker.Lorem.Sentence(4),
+                            Description = faker.Lorem.Paragraph(),
+                            Status = faker.PickRandom(taskStatuses),
+                            DueDate = faker.Date.Future(1),
+                            CreatedBy = adminId,  // Unique admin per task
+                            AssignedToUserId = null,     // All tasks unassigned
+                            IsDeleted = false
+                        });
+                    }
+
+                    context.Tasks.AddRange(tasks);
+                    await context.SaveChangesAsync();
+                    context.ChangeTracker.Clear();
+
+                    Log.Information("Seeded {Done}/{Total} tasks...", i + currentBatch, totalTasks);
+                }
+
+                context.ChangeTracker.AutoDetectChangesEnabled = true;
+                Log.Information("Task seeding complete! 200,000 tasks added. Each task has a unique admin. All unassigned.");
+            }
+        }
+        else
+        {
+            Log.Information("Tasks already exist. Skipping task seed.");
         }
     }
 
@@ -185,15 +264,13 @@ try
     // MIDDLEWARE PIPELINE
     // ─────────────────────────────────────────────
 
-    // Always enable Swagger
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "TaskManagementAPI v1");
-        c.RoutePrefix = "swagger"; // Access at: https://localhost:{port}/swagger/index.html
+        c.RoutePrefix = "swagger";
     });
 
-    // Serilog Request Logging Middleware
     app.UseSerilogRequestLogging(options =>
     {
         options.MessageTemplate =
