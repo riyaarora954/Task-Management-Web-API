@@ -1,5 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Sieve.Models;
+using Sieve.Services;
 using TM.Contracts.Auth;
 using TM.ServiceLogic.Interfaces;
 
@@ -10,10 +13,12 @@ namespace TM.WebAPI.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
+        private readonly ISieveProcessor _sieveProcessor;
 
-        public AuthController(IAuthService authService)
+        public AuthController(IAuthService authService, ISieveProcessor sieveProcessor)
         {
             _authService = authService;
+            _sieveProcessor = sieveProcessor;
         }
 
         //Register Endpoint 
@@ -57,20 +62,21 @@ namespace TM.WebAPI.Controllers
             }
         }
 
-        //GetAllUsers EndPoint
+        // GetAllUsers EndPoint with Keyset Pagination
         [HttpGet("users")]
         [Authorize(Roles = "SuperAdmin")]
-        public async Task<IActionResult> GetAllUsers()
+        public async Task<IActionResult> GetAllUsers([FromQuery] SieveModel sieveModel)
         {
-            if (User?.Identity?.IsAuthenticated != true)
-                return Unauthorized(new { message = "You are not authenticated. Please provide a valid token." });
+            // 1. Senior Dev Safety: Force a default and a maximum limit
+            sieveModel.PageSize ??= 10;
+            if (sieveModel.PageSize > 100) sieveModel.PageSize = 100;
 
             try
             {
-                var users = await _authService.GetUsersByRoleAsync("User");
-                // Handling empty database response
+                var users = await _authService.GetUsersByRoleAsync("User", sieveModel);
+
                 if (users == null || !users.Any())
-                    return NotFound(new { message = "No users found in the system." });
+                    return NotFound(new { message = "No users found for the requested page." });
 
                 return Ok(users);
             }
@@ -83,18 +89,18 @@ namespace TM.WebAPI.Controllers
         //GetAllAdmins EndPoint
         [HttpGet("admins")]
         [Authorize(Roles = "SuperAdmin")]
-        public async Task<IActionResult> GetAllAdmins()
+        public async Task<IActionResult> GetAllAdmins([FromQuery] SieveModel sieveModel)
         {
-            if (User?.Identity?.IsAuthenticated != true)
-                return Unauthorized(new { message = "You are not authenticated. Please provide a valid token." });
+            // 1. Safety Cap
+            sieveModel.PageSize ??= 10;
+            if (sieveModel.PageSize > 100) sieveModel.PageSize = 100;
 
             try
             {
-                var admins = await _authService.GetUsersByRoleAsync("Admin");
+                var admins = await _authService.GetUsersByRoleAsync("Admin", sieveModel);
 
-                // Handling empty database response
                 if (admins == null || !admins.Any())
-                    return NotFound(new { message = "No admins found in the system." });
+                    return NotFound(new { message = "No admins found for the requested page." });
 
                 return Ok(admins);
             }
@@ -103,6 +109,7 @@ namespace TM.WebAPI.Controllers
                 return StatusCode(500, new { message = "Error retrieving admins.", error = ex.Message });
             }
         }
+    
 
         //Delete User EndPoint
         [HttpDelete("users/{id}")]

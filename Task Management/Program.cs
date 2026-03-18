@@ -11,6 +11,7 @@ using TM.Model.Entities;
 using TM.ServiceLogic.Implementations;
 using TM.ServiceLogic.Interfaces;
 using TM.ServiceLogic.Mappings;
+using Sieve.Services;
 
 // 1. Setup Initial Bootstrap Logger
 Log.Logger = new LoggerConfiguration()
@@ -30,6 +31,8 @@ try
         .WriteTo.Console()
         .WriteTo.File("logs/task_management_log.txt", rollingInterval: RollingInterval.Day)
         .ReadFrom.Configuration(ctx.Configuration));
+
+    builder.Services.AddApplicationInsightsTelemetry();
 
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
@@ -68,6 +71,7 @@ try
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<ITaskService, TaskService>();
     builder.Services.AddScoped<ICommentService, CommentService>();
+    builder.Services.AddScoped<ISieveProcessor, SieveProcessor>();
 
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
@@ -158,7 +162,7 @@ try
             context.ChangeTracker.AutoDetectChangesEnabled = false;
 
             const int userBatchSize = 2000;
-            const int totalUsers = 600_000;
+            const int totalUsers = 10_000;
 
             for (int i = 0; i < totalUsers; i += userBatchSize)
             {

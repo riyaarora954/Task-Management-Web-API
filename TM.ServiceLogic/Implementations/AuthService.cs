@@ -2,6 +2,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using Sieve.Models;
+using Sieve.Services; // Required for ISieveProcessor
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -17,15 +19,20 @@ namespace TM.ServiceLogic.Implementations
         private readonly TMDbContext _context;
         private readonly IMapper _mapper;
         private readonly IConfiguration _config;
+        private readonly ISieveProcessor _sieveProcessor; // Injected for Sieve support
 
-        public AuthService(TMDbContext context, IMapper mapper, IConfiguration config)
+        public AuthService(
+            TMDbContext context,
+            IMapper mapper,
+            IConfiguration config,
+            ISieveProcessor sieveProcessor)
         {
             _context = context;
             _mapper = mapper;
             _config = config;
+            _sieveProcessor = sieveProcessor;
         }
 
-        // The RegisterAsync method checks if the email is already registered, hashes the password, assigns a role, and saves the new user to the database. It returns an AuthResponse with user details if successful, or null if the email is already in use.
         public async Task<AuthResponse?> RegisterAsync(RegisterRequest request)
         {
             try
@@ -33,8 +40,7 @@ namespace TM.ServiceLogic.Implementations
                 if (await _context.Users.AnyAsync(u => u.Email == request.Email))
                     return null;
 
-                if (!Enum.TryParse<UserRole>(request.Role, true, out var 
-                    assignedRole))
+                if (!Enum.TryParse<UserRole>(request.Role, true, out var assignedRole))
                 {
                     assignedRole = UserRole.User;
                 }
@@ -60,7 +66,6 @@ namespace TM.ServiceLogic.Implementations
             }
         }
 
-        // Verifies credentials, generates a JWT token upon success, and returns user details.
         public async Task<AuthResponse?> LoginAsync(LoginRequest request)
         {
             try
@@ -81,27 +86,37 @@ namespace TM.ServiceLogic.Implementations
             }
         }
 
-        // Retrieves users by role, ensuring that if the role is invalid or no users are found, an empty enumerable is returned instead of null.
-        public async Task<IEnumerable<UserResponse>> GetUsersByRoleAsync(string role)
+        /// <summary>
+        /// Retrieves users by role using Sieve for optimized Offset Pagination.
+        /// Works for both 'User' and 'Admin' roles.
+        /// </summary>
+        public async Task<IEnumerable<UserResponse>> GetUsersByRoleAsync(string role, SieveModel sieveModel)
         {
             try
             {
+                // 1. Validate the Role string matches our Enum
                 if (!Enum.TryParse<UserRole>(role, true, out var roleEnum))
                     return Enumerable.Empty<UserResponse>();
 
-                var users = await _context.Users
-                    .Where(u => !u.IsDeleted && u.Role == roleEnum)
+                // 2. Build the Base Query (Using AsNoTracking for high-performance read)
+                var query = _context.Users
+                    .AsNoTracking()
+                    .Where(u => !u.IsDeleted && u.Role == roleEnum);
+
+                // 3. Apply Sieve (Handles Page, PageSize, Sorts, and Filters)
+                // This generates the SQL OFFSET/FETCH logic
+                var pagedUsers = await _sieveProcessor.Apply(sieveModel, query)
                     .ToListAsync();
 
-                return _mapper.Map<IEnumerable<UserResponse>>(users) ?? Enumerable.Empty<UserResponse>();
+                // 4. Map to DTOs for the API response
+                return _mapper.Map<IEnumerable<UserResponse>>(pagedUsers);
             }
             catch (Exception ex)
             {
-                throw new Exception($"Service Error: Could not fetch users for role {role}. {ex.Message}");
+                throw new Exception($"Service Error: Could not fetch users. {ex.Message}");
             }
         }
 
-        // Validates and soft-deletes a user after checking role restrictions and active task assignments.
         public async Task<(bool Success, string Message)> SoftDeleteUserAsync(int id)
         {
             try
@@ -114,6 +129,7 @@ namespace TM.ServiceLogic.Implementations
                 if (user.Role == UserRole.SuperAdmin)
                     return (false, "The SuperAdmin cannot be deleted.");
 
+                // Check active assignments before allowing delete
                 bool isAssignedToAnything = await _context.Tasks.AnyAsync(t =>
                     t.AssignedToUserId == id && !t.IsDeleted);
 
@@ -131,7 +147,6 @@ namespace TM.ServiceLogic.Implementations
             }
         }
 
-        //Generates a JWT token
         private string GenerateJwtToken(User user)
         {
             var key = _config["Jwt:Key"];
@@ -142,9 +157,9 @@ namespace TM.ServiceLogic.Implementations
 
             var claims = new[]
             {
-                new System.Security.Claims.Claim(ClaimTypes.Name, user.Username),
-                new System.Security.Claims.Claim(ClaimTypes.Role, user.Role.ToString()),
-                new System.Security.Claims.Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.Role, user.Role.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
             };
 
             var token = new JwtSecurityToken(
