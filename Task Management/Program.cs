@@ -12,25 +12,62 @@ using TM.ServiceLogic.Implementations;
 using TM.ServiceLogic.Interfaces;
 using TM.ServiceLogic.Mappings;
 
-// 1. Setup Initial Bootstrap Logger
+// ─────────────────────────────────────────────
+// 1. BOOTSTRAP LOGGER (used before host builds)
+// ─────────────────────────────────────────────
 Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+    .MinimumLevel.Information()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+    .MinimumLevel.Override("Microsoft.EntityFrameworkCore.Database.Command", LogEventLevel.Warning)
+    .MinimumLevel.Override("System", LogEventLevel.Warning)
     .Enrich.FromLogContext()
-    .WriteTo.Console()
+    .WriteTo.Console(
+        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
     .CreateBootstrapLogger();
 
 try
 {
-    Log.Information("Starting Task Management Web API...");
+    Log.Information("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    Log.Information("  Task Management Web API — Starting Up");
+    Log.Information("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     var builder = WebApplication.CreateBuilder(args);
 
-    // 2. Configure Serilog for the App Host
+    // ─────────────────────────────────────────────
+    // 2. SERILOG — APP HOST CONFIGURATION
+    // ─────────────────────────────────────────────
     builder.Host.UseSerilog((ctx, lc) => lc
-        .WriteTo.Console()
-        .WriteTo.File("logs/task_management_log.txt", rollingInterval: RollingInterval.Day)
+        .MinimumLevel.Information()
+
+        // Suppress internal ASP.NET + EF Core noise — these flood the log file
+        .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+        .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+        .MinimumLevel.Override("Microsoft.EntityFrameworkCore.Database.Command", LogEventLevel.Warning)
+        .MinimumLevel.Override("Microsoft.AspNetCore.Hosting", LogEventLevel.Warning)
+        .MinimumLevel.Override("Microsoft.AspNetCore.Mvc", LogEventLevel.Warning)
+        .MinimumLevel.Override("Microsoft.AspNetCore.Routing", LogEventLevel.Warning)
+        .MinimumLevel.Override("System.Net.Http.HttpClient", LogEventLevel.Warning)
+
+        .Enrich.FromLogContext()
+
+        // Console — short and readable (developer-friendly)
+        .WriteTo.Console(
+            outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+
+        // File — includes date, rolls daily, keeps 7 days
+        .WriteTo.File(
+            path: "logs/task_management_.txt",
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: 7,
+            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
+
+        // Allow appsettings.json to override any level at runtime
         .ReadFrom.Configuration(ctx.Configuration));
 
+    // ─────────────────────────────────────────────
+    // SERVICES
+    // ─────────────────────────────────────────────
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
 
@@ -100,16 +137,16 @@ try
         var context = services.GetRequiredService<TMDbContext>();
 
         // STEP 1: Apply pending migrations
-        Log.Information("Applying pending migrations...");
+        Log.Information("[Migration] Applying pending migrations...");
         await context.Database.MigrateAsync();
-        Log.Information("Migrations applied successfully.");
+        Log.Information("[Migration] Migrations applied successfully.");
 
         // STEP 2: Seed SuperAdmin ONLY if not already present
         bool superAdminExists = await context.Users.AnyAsync(u => u.Role == UserRole.SuperAdmin);
 
         if (!superAdminExists)
         {
-            Log.Information("Seeding SuperAdmin user...");
+            Log.Information("[Seed] SuperAdmin not found — seeding...");
 
             var superAdmin = new User
             {
@@ -124,24 +161,24 @@ try
             context.Users.Add(superAdmin);
             await context.SaveChangesAsync();
 
-            Log.Information("SuperAdmin seeded. Email: superadmin@taskmanager.com | Password: SuperAdmin@123");
+            Log.Information("[Seed] SuperAdmin created | Email: superadmin@taskmanager.com | Password: SuperAdmin@123");
         }
         else
         {
-            Log.Information("SuperAdmin already exists. Skipping.");
+            Log.Information("[Seed] SuperAdmin already exists — skipping.");
         }
 
         // STEP 3: Reseed identity counter
-        Log.Information("Reseeding identity counter...");
+        Log.Information("[DB] Reseeding Users identity counter...");
         await context.Database.ExecuteSqlRawAsync("DBCC CHECKIDENT ('Users', RESEED, 1)");
-        Log.Information("Identity counter reset successfully.");
+        Log.Information("[DB] Identity counter reset to 1.");
 
         // STEP 4: Seed 600,000 fake users ONLY if they don't already exist
         bool fakeUsersExist = await context.Users.AnyAsync(u => u.Role != UserRole.SuperAdmin);
 
         if (!fakeUsersExist)
         {
-            Log.Information("Seeding 600,000 fake users via Bogus...");
+            Log.Information("[Seed] No fake users found — seeding 600,000 users...");
 
             const string commonPwd = "Test@123";
             string hashedPassword = BCrypt.Net.BCrypt.HashPassword(commonPwd);
@@ -166,60 +203,61 @@ try
                 context.Users.AddRange(batch);
                 await context.SaveChangesAsync();
                 context.ChangeTracker.Clear();
-                Log.Information("Seeded {Done}/{Total} fake users...", i + batch.Count, totalUsers);
+
+                // Log progress every 50,000 users to avoid log spam
+                if ((i + batch.Count) % 50_000 == 0 || (i + batch.Count) == totalUsers)
+                    Log.Information("[Seed] Users: {Done:N0} / {Total:N0}", i + batch.Count, totalUsers);
             }
 
             context.ChangeTracker.AutoDetectChangesEnabled = true;
-            Log.Information("User seeding complete! 600,000 fake users added. Password: {Pwd}", commonPwd);
+            Log.Information("[Seed] User seeding complete — 600,000 users added. Common password: {Pwd}", commonPwd);
         }
         else
         {
-            Log.Information("Fake users already exist. Skipping user seed.");
+            Log.Information("[Seed] Fake users already exist — skipping user seed.");
         }
 
         // STEP 5: Seed 200,000 tasks ONLY if they don't already exist
-        // Every task has a DIFFERENT admin as creator — no admin is reused
         bool tasksExist = await context.Tasks.AnyAsync();
 
         if (!tasksExist)
         {
-            Log.Information("Fetching Admin user Ids for task seeding...");
+            Log.Information("[Seed] No tasks found — seeding 200,000 tasks...");
+            Log.Information("[Seed] Fetching Admin user IDs...");
 
-            // Fetch only the first 200,000 admins — we need exactly one unique admin per task
             var adminIds = await context.Users
                 .Where(u => u.Role == UserRole.Admin && !u.IsDeleted)
                 .Select(u => u.Id)
-                .Take(200_000)       // We only need 200k since we have 200k tasks
+                .Take(200_000)
                 .ToListAsync();
 
             if (adminIds.Count == 0)
             {
-                Log.Warning("No Admin users found. Skipping task seeding.");
+                Log.Warning("[Seed] No Admin users found — skipping task seed.");
             }
             else
             {
-                Log.Information("Found {Count} admins. Shuffling for unique assignment...", adminIds.Count);
+                Log.Information("[Seed] Found {Count:N0} admins — shuffling for unique assignment...", adminIds.Count);
 
-                // Shuffle admin list so assignment is random, not sequential
                 var rng = new Random();
                 adminIds = adminIds.OrderBy(_ => rng.Next()).ToList();
 
-                Log.Information("Shuffle complete. Starting task seeding...");
+                Log.Information("[Seed] Shuffle complete — starting task seeding...");
 
                 var faker = new Faker();
 
                 var taskStatuses = new[]
-                     {
-                        TM.Model.Entities.TaskStatus.Pending,
-                        TM.Model.Entities.TaskStatus.InProgress,
-                        TM.Model.Entities.TaskStatus.Completed
-                    };
+                {
+                    TM.Model.Entities.TaskStatus.Pending,
+                    TM.Model.Entities.TaskStatus.InProgress,
+                    TM.Model.Entities.TaskStatus.Completed
+                };
 
                 context.ChangeTracker.AutoDetectChangesEnabled = false;
                 context.Database.SetCommandTimeout(600);
 
-                const int taskBatchSize = 1000;
-                const int totalTasks = 3_000;
+                const int taskBatchSize = 2000;
+                const int totalTasks = 200_000;
 
                 for (int i = 0; i < totalTasks; i += taskBatchSize)
                 {
@@ -228,7 +266,6 @@ try
 
                     for (int j = 0; j < currentBatch; j++)
                     {
-                        // Each task gets a completely unique admin — no repeats
                         var adminId = adminIds[i + j];
 
                         tasks.Add(new TM.Model.Entities.Task
@@ -237,8 +274,8 @@ try
                             Description = faker.Lorem.Paragraph(),
                             Status = faker.PickRandom(taskStatuses),
                             DueDate = faker.Date.Future(1),
-                            CreatedBy = adminId,  // Unique admin per task
-                            AssignedToUserId = null,     // All tasks unassigned
+                            CreatedBy = adminId,
+                            AssignedToUserId = null,
                             IsDeleted = false
                         });
                     }
@@ -247,16 +284,18 @@ try
                     await context.SaveChangesAsync();
                     context.ChangeTracker.Clear();
 
-                    Log.Information("Seeded {Done}/{Total} tasks...", i + currentBatch, totalTasks);
+                    // Log progress every 50,000 tasks to avoid log spam
+                    if ((i + currentBatch) % 50_000 == 0 || (i + currentBatch) == totalTasks)
+                        Log.Information("[Seed] Tasks: {Done:N0} / {Total:N0}", i + currentBatch, totalTasks);
                 }
 
                 context.ChangeTracker.AutoDetectChangesEnabled = true;
-                Log.Information("Task seeding complete! 200,000 tasks added. Each task has a unique admin. All unassigned.");
+                Log.Information("[Seed] Task seeding complete — 200,000 tasks added. Each assigned a unique admin. All unassigned.");
             }
         }
         else
         {
-            Log.Information("Tasks already exist. Skipping task seed.");
+            Log.Information("[Seed] Tasks already exist — skipping task seed.");
         }
     }
 
@@ -271,16 +310,26 @@ try
         c.RoutePrefix = "swagger";
     });
 
+    // 3. SERILOG REQUEST LOGGING — one clean line per HTTP request
     app.UseSerilogRequestLogging(options =>
     {
+        // Format: HTTP GET /api/tasks → 200 in 14.2ms
         options.MessageTemplate =
-            "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+            "HTTP {RequestMethod} {RequestPath} → {StatusCode} in {Elapsed:0.0}ms";
+
+        // 4xx = Warning (yellow), 5xx or exception = Error (red), rest = Info
+        options.GetLevel = (httpContext, elapsed, ex) =>
+            ex != null || httpContext.Response.StatusCode >= 500
+                ? LogEventLevel.Error
+                : httpContext.Response.StatusCode >= 400
+                    ? LogEventLevel.Warning
+                    : LogEventLevel.Information;
     });
 
     app.UseHttpsRedirection();
     app.UseRouting();
 
-    // Consistency Middleware for 401 / 403 responses
+    // Consistent JSON body for 401 / 403
     app.Use(async (httpContext, next) =>
     {
         await next();
@@ -308,11 +357,15 @@ try
 
     app.MapControllers();
 
+    Log.Information("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    Log.Information("  Task Management Web API — Running");
+    Log.Information("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
     app.Run();
 }
 catch (Exception ex)
 {
-    Log.Fatal(ex, "Application start-up failed.");
+    Log.Fatal(ex, "[FATAL] Application start-up failed.");
 }
 finally
 {
