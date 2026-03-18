@@ -1,5 +1,8 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Sieve.Models;
+using Sieve.Services;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using TM.Contracts.Auth;
@@ -12,11 +15,12 @@ namespace TM.WebAPI.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
+        private readonly ISieveProcessor _sieveProcessor;
         private readonly ILogger<AuthController> _logger;
-
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
+        public AuthController(IAuthService authService, ILogger<AuthController> logger, ISieveProcessor sieveProcessor)
         {
             _authService = authService;
+            _sieveProcessor = sieveProcessor;
             _logger = logger;
         }
 
@@ -42,7 +46,7 @@ namespace TM.WebAPI.Controllers
                     return BadRequest(new { message = "Email already exists or registration failed." });
                 }
 
-                _logger.LogInformation("[AuthController] POST register | SUCCESS UserId={UserId} | {Elapsed}ms", response.Id, sw.ElapsedMilliseconds);
+                _logger.LogInformation("[AuthController] POST register | SUCCESS Username={Username} | {Elapsed}ms", response.Username, sw.ElapsedMilliseconds);
                 return Ok(response);
             }
             catch (Exception ex)
@@ -74,7 +78,7 @@ namespace TM.WebAPI.Controllers
                     return Unauthorized(new { message = "Invalid email or password." });
                 }
 
-                _logger.LogInformation("[AuthController] POST login | SUCCESS UserId={UserId} Role={Role} | {Elapsed}ms", response.Id, response.Role, sw.ElapsedMilliseconds);
+                _logger.LogInformation("[AuthController] POST login | SUCCESS Username={Username} Role={Role} | {Elapsed}ms", response.Username, response.Role, sw.ElapsedMilliseconds);
                 return Ok(response);
             }
             catch (Exception ex)
@@ -85,22 +89,21 @@ namespace TM.WebAPI.Controllers
             }
         }
 
-        // GetAllUsers Endpoint
+        // GetAllUsers EndPoint with Keyset Pagination
         [HttpGet("users")]
         [Authorize(Roles = "SuperAdmin")]
-        public async Task<IActionResult> GetAllUsers()
+        public async Task<IActionResult> GetAllUsers([FromQuery] SieveModel sieveModel)
         {
-            if (User?.Identity?.IsAuthenticated != true)
-                return Unauthorized(new { message = "You are not authenticated. Please provide a valid token." });
+            // 1. Senior Dev Safety: Force a default and a maximum limit
+            sieveModel.PageSize ??= 10;
+            if (sieveModel.PageSize > 100) sieveModel.PageSize = 100;
 
             var sw = Stopwatch.StartNew();
             _logger.LogInformation("[AuthController] GET users");
 
             try
             {
-                var users = await _authService.GetUsersByRoleAsync("User");
-
-                sw.Stop();
+                var users = await _authService.GetUsersByRoleAsync("User", sieveModel);
 
                 if (users == null || !users.Any())
                 {
@@ -122,17 +125,18 @@ namespace TM.WebAPI.Controllers
         // GetAllAdmins Endpoint
         [HttpGet("admins")]
         [Authorize(Roles = "SuperAdmin")]
-        public async Task<IActionResult> GetAllAdmins()
+        public async Task<IActionResult> GetAllAdmins([FromQuery] SieveModel sieveModel)
         {
-            if (User?.Identity?.IsAuthenticated != true)
-                return Unauthorized(new { message = "You are not authenticated. Please provide a valid token." });
+            // 1. Safety Cap
+            sieveModel.PageSize ??= 10;
+            if (sieveModel.PageSize > 100) sieveModel.PageSize = 100;
 
             var sw = Stopwatch.StartNew();
             _logger.LogInformation("[AuthController] GET admins");
 
             try
             {
-                var admins = await _authService.GetUsersByRoleAsync("Admin");
+                var admins = await _authService.GetUsersByRoleAsync("Admin", sieveModel);
 
                 sw.Stop();
 

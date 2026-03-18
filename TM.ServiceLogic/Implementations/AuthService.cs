@@ -4,6 +4,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using System.Diagnostics;
+using Sieve.Models;
+using Sieve.Services;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -20,16 +22,23 @@ namespace TM.ServiceLogic.Implementations
         private readonly IMapper _mapper;
         private readonly IConfiguration _config;
         private readonly ILogger<AuthService> _logger;
+        private readonly ISieveProcessor _sieveProcessor;
 
-        public AuthService(TMDbContext context, IMapper mapper, IConfiguration config, ILogger<AuthService> logger)
+        public AuthService(
+            TMDbContext context,
+            IMapper mapper,
+            IConfiguration config,
+            ISieveProcessor sieveProcessor,
+            ILogger<AuthService> logger
+            )
         {
             _context = context;
             _mapper = mapper;
             _config = config;
             _logger = logger;
+            _sieveProcessor = sieveProcessor;
         }
 
-        // The RegisterAsync method checks if the email is already registered, hashes the password, assigns a role, and saves the new user to the database. It returns an AuthResponse with user details if successful, or null if the email is already in use.
         public async Task<AuthResponse?> RegisterAsync(RegisterRequest request)
         {
             var sw = Stopwatch.StartNew();
@@ -76,7 +85,6 @@ namespace TM.ServiceLogic.Implementations
             }
         }
 
-        // Verifies credentials, generates a JWT token upon success, and returns user details.
         public async Task<AuthResponse?> LoginAsync(LoginRequest request)
         {
             var sw = Stopwatch.StartNew();
@@ -110,14 +118,17 @@ namespace TM.ServiceLogic.Implementations
             }
         }
 
-        // Retrieves users by role, ensuring that if the role is invalid or no users are found, an empty enumerable is returned instead of null.
-        public async Task<IEnumerable<UserResponse>> GetUsersByRoleAsync(string role)
+        /// <summary>
+        /// Retrieves users by role using Sieve for optimized Offset Pagination.
+        /// </summary>
+        public async Task<IEnumerable<UserResponse>> GetUsersByRoleAsync(string role, SieveModel sieveModel)
         {
             var sw = Stopwatch.StartNew();
             _logger.LogInformation("[AuthService] GetUsersByRoleAsync | Role={Role}", role);
 
             try
             {
+                // 1. Validate Role
                 if (!Enum.TryParse<UserRole>(role, true, out var roleEnum))
                 {
                     sw.Stop();
@@ -125,12 +136,19 @@ namespace TM.ServiceLogic.Implementations
                     return Enumerable.Empty<UserResponse>();
                 }
 
-                var users = await _context.Users
-                    .Where(u => !u.IsDeleted && u.Role == roleEnum)
+                // 2. Base Query
+                var query = _context.Users
+                    .AsNoTracking()
+                    .Where(u => !u.IsDeleted && u.Role == roleEnum);
+
+                // 3. Apply Sieve and execute
+                // We named the variable 'users' to match your logging/mapping logic below
+                var users = await _sieveProcessor.Apply(sieveModel, query)
                     .ToListAsync();
 
                 sw.Stop();
 
+                // 4. Log and Return
                 if (sw.ElapsedMilliseconds > 500)
                     _logger.LogWarning("[AuthService] GetUsersByRoleAsync | SLOW QUERY Role={Role} | Count={Count} | {Elapsed}ms", role, users.Count, sw.ElapsedMilliseconds);
                 else
@@ -146,7 +164,6 @@ namespace TM.ServiceLogic.Implementations
             }
         }
 
-        // Validates and soft-deletes a user after checking role restrictions and active task assignments.
         public async Task<(bool Success, string Message)> SoftDeleteUserAsync(int id)
         {
             var sw = Stopwatch.StartNew();
@@ -202,7 +219,6 @@ namespace TM.ServiceLogic.Implementations
             }
         }
 
-        // Generates a JWT token
         private string GenerateJwtToken(User user)
         {
             var key = _config["Jwt:Key"];
@@ -213,9 +229,9 @@ namespace TM.ServiceLogic.Implementations
 
             var claims = new[]
             {
-                new System.Security.Claims.Claim(ClaimTypes.Name, user.Username),
-                new System.Security.Claims.Claim(ClaimTypes.Role, user.Role.ToString()),
-                new System.Security.Claims.Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.Role, user.Role.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
             };
 
             var token = new JwtSecurityToken(
